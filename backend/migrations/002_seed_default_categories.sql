@@ -1,0 +1,1 @@
+-- 002_seed_default_categories.sql
