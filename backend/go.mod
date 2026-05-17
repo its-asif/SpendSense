@@ -1,1 +1,1 @@
-module expense-tracker-backend
+module spendsense-backend
