@@ -8,7 +8,7 @@ CREATE TABLE users (
 	email VARCHAR(255) NOT NULL UNIQUE,
 	password_hash VARCHAR(255) NOT NULL,
 	display_name VARCHAR(255),
-	avatar_path VARCHAR(500),
+	avatar_url VARCHAR(500),
 	base_currency VARCHAR(3) NOT NULL DEFAULT 'USD',
 	timezone VARCHAR(50) NOT NULL DEFAULT 'UTC',
 	locale VARCHAR(10) NOT NULL DEFAULT 'en-US',

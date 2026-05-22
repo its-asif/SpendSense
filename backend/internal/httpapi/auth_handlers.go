@@ -1,0 +1,260 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+	"time"
+
+	"spendsense-backend/internal/auth"
+	"spendsense-backend/internal/domain"
+	"spendsense-backend/internal/middleware"
+
+	"github.com/google/uuid"
+)
+
+type errorResponse struct {
+	Error responseErrorBody `json:"error"`
+}
+
+type responseErrorBody struct {
+	Code    string  `json:"code"`
+	Message string  `json:"message"`
+	Field   *string `json:"field,omitempty"`
+}
+
+type registerRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type refreshRequest struct {
+	Email        string `json:"email"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type userResponse struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	DisplayName  *string   `json:"display_name,omitempty"`
+	AvatarURL    *string   `json:"avatar_url,omitempty"`
+	BaseCurrency string    `json:"base_currency"`
+	Timezone     string    `json:"timezone"`
+	Locale       string    `json:"locale"`
+	CreatedAt    string    `json:"created_at"`
+	UpdatedAt    string    `json:"updated_at"`
+}
+
+type authResponse struct {
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token,omitempty"`
+	User         userResponse `json:"user,omitempty"`
+}
+
+type tokenResponse struct {
+	AccessToken string `json:"access_token"`
+}
+
+type currentUserResponse struct {
+	UserID string `json:"user_id"`
+	Email  string `json:"email"`
+}
+
+func (s *Server) routes() {
+	s.mux.HandleFunc("/health", handleHealth)
+	s.mux.HandleFunc("/auth/register", s.handleRegister)
+	s.mux.HandleFunc("/auth/login", s.handleLogin)
+	s.mux.HandleFunc("/auth/refresh", s.handleRefresh)
+	s.mux.Handle("/auth/me", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleMe)))
+}
+
+func handleHealth(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	var req registerRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeRequestError(w, err)
+		return
+	}
+
+	resp, err := s.authService.Register(r.Context(), auth.RegisterRequest{
+		Email:    strings.TrimSpace(req.Email),
+		Password: req.Password,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, authResponse{
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+		User:         toUserResponse(resp.User),
+	})
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	var req loginRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeRequestError(w, err)
+		return
+	}
+
+	resp, err := s.authService.Login(r.Context(), strings.TrimSpace(req.Email), req.Password)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, authResponse{
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+		User:         toUserResponse(resp.User),
+	})
+}
+
+func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	var req refreshRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeRequestError(w, err)
+		return
+	}
+
+	user, err := s.authService.GetUserByEmail(r.Context(), strings.TrimSpace(req.Email))
+	if err != nil || user == nil {
+		writeStatusError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found")
+		return
+	}
+
+	accessToken, err := s.authService.RefreshAccessToken(r.Context(), user.ID, strings.TrimSpace(req.RefreshToken))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tokenResponse{AccessToken: accessToken})
+}
+
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeStatusError(w, http.StatusInternalServerError, string(domain.ErrInternal), "Missing authenticated user")
+		return
+	}
+
+	email, _ := middleware.EmailFromContext(r.Context())
+	writeJSON(w, http.StatusOK, currentUserResponse{
+		UserID: userID.String(),
+		Email:  email,
+	})
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	defer r.Body.Close()
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); err == nil {
+		return fmt.Errorf("unexpected extra JSON content")
+	} else if !errors.Is(err, io.EOF) {
+		return err
+	}
+
+	return nil
+}
+
+func writeRequestError(w http.ResponseWriter, err error) {
+	message := "Invalid request body"
+	if err != nil {
+		message = err.Error()
+	}
+	writeStatusError(w, http.StatusBadRequest, "INVALID_REQUEST", message)
+}
+
+func writeStatusError(w http.ResponseWriter, statusCode int, code, message string) {
+	writeJSON(w, statusCode, errorResponse{
+		Error: responseErrorBody{
+			Code:    code,
+			Message: message,
+		},
+	})
+}
+
+func writeError(w http.ResponseWriter, err error) {
+	var domainErr *domain.DomainError
+	if errors.As(err, &domainErr) {
+		statusCode := domainErr.StatusCode
+		if statusCode == 0 {
+			statusCode = http.StatusInternalServerError
+		}
+
+		writeJSON(w, statusCode, errorResponse{
+			Error: responseErrorBody{
+				Code:    string(domainErr.Code),
+				Message: domainErr.Message,
+				Field:   domainErr.Field,
+			},
+		})
+		return
+	}
+
+	writeStatusError(w, http.StatusInternalServerError, string(domain.ErrInternal), "Internal server error")
+}
+
+func writeJSON(w http.ResponseWriter, statusCode int, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		log.Printf("failed to write JSON response: %v", err)
+	}
+}
+
+func toUserResponse(user *domain.User) userResponse {
+	if user == nil {
+		return userResponse{}
+	}
+
+	return userResponse{
+		ID:           user.ID,
+		Email:        user.Email,
+		DisplayName:  user.DisplayName,
+		AvatarURL:    user.AvatarURL,
+		BaseCurrency: user.BaseCurrency,
+		Timezone:     user.Timezone,
+		Locale:       user.Locale,
+		CreatedAt:    user.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:    user.UpdatedAt.Format(time.RFC3339),
+	}
+}
