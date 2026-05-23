@@ -39,4 +39,6 @@ func main() {
 	if err := server.Start(port); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
+
+	fmt.Printf("Server running on port %s\n", port)
 }

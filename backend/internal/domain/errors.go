@@ -16,7 +16,9 @@ const (
 	ErrInvalidAmount   ErrorCode = "INVALID_AMOUNT"
 	ErrInvalidDate     ErrorCode = "INVALID_DATE"
 	ErrInvalidCategory ErrorCode = "INVALID_CATEGORY"
+	ErrInvalidWallet   ErrorCode = "INVALID_WALLET"
 	ErrInvalidCurrency ErrorCode = "INVALID_CURRENCY"
+	ErrInvalidCursor   ErrorCode = "INVALID_CURSOR"
 
 	// Resource errors
 	ErrNotFound      ErrorCode = "NOT_FOUND"

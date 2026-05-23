@@ -7,15 +7,21 @@ import (
 	"time"
 
 	"spendsense-backend/internal/auth"
+	"spendsense-backend/internal/category"
+	"spendsense-backend/internal/expense"
 	"spendsense-backend/internal/infra"
 	"spendsense-backend/internal/middleware"
+	"spendsense-backend/internal/wallet"
 )
 
 type Server struct {
-	db             *infra.Database
-	authService    *auth.AuthService
-	authMiddleware *middleware.AuthMiddleware
-	mux            *http.ServeMux
+	db              *infra.Database
+	authService     *auth.AuthService
+	authMiddleware  *middleware.AuthMiddleware
+	mux             *http.ServeMux
+	expenseService  *expense.Service
+	walletService   *wallet.Service
+	categoryService *category.Service
 }
 
 func NewServer(databaseURL, jwtSecret string) (*Server, error) {
@@ -25,10 +31,13 @@ func NewServer(databaseURL, jwtSecret string) (*Server, error) {
 	}
 
 	server := &Server{
-		db:             db,
-		authService:    auth.NewAuthService(db, auth.NewJWTManager(jwtSecret)),
-		authMiddleware: middleware.NewAuthMiddleware(auth.NewJWTManager(jwtSecret)),
-		mux:            http.NewServeMux(),
+		db:              db,
+		authService:     auth.NewAuthService(db, auth.NewJWTManager(jwtSecret)),
+		authMiddleware:  middleware.NewAuthMiddleware(auth.NewJWTManager(jwtSecret)),
+		mux:             http.NewServeMux(),
+		expenseService:  expense.NewService(expense.NewRepository(db)),
+		walletService:   wallet.NewService(wallet.NewRepository(db)),
+		categoryService: category.NewService(category.NewRepository(db)),
 	}
 
 	server.routes()

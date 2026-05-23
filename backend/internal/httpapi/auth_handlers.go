@@ -75,6 +75,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/auth/login", s.handleLogin)
 	s.mux.HandleFunc("/auth/refresh", s.handleRefresh)
 	s.mux.Handle("/auth/me", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleMe)))
+	s.registerExpenseRoutes()
+	s.registerWalletRoutes()
+	s.registerCategoryRoutes()
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {
