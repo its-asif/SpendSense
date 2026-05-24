@@ -74,6 +74,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/auth/register", s.handleRegister)
 	s.mux.HandleFunc("/auth/login", s.handleLogin)
 	s.mux.HandleFunc("/auth/refresh", s.handleRefresh)
+	s.mux.Handle("/auth/logout", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleLogout)))
 	s.mux.Handle("/auth/me", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleMe)))
 	s.registerExpenseRoutes()
 	s.registerWalletRoutes()
@@ -178,8 +179,50 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeStatusError(w, http.StatusUnauthorized, string(domain.ErrUnauthorized), "Unauthorized")
+		return
+	}
+
+	var req struct{
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeRequestError(w, err)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		writeStatusError(w, http.StatusBadRequest, "INVALID_REQUEST", "refresh_token is required")
+		return
+	}
+
+	if err := s.authService.Logout(r.Context(), userID, req.RefreshToken); err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+
+/*
+	Decodes JSON from the request body into the provided destination struct.
+	
+	- dst should be a pointer to a struct where the decoded data will be stored.
+	- The request body is limited to 1MB to prevent abuse.
+	- Unknown fields in the JSON will cause an error, ensuring that only expected data is processed.
+*/
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	defer r.Body.Close()
+	// Limit request body to 1MB
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	decoder := json.NewDecoder(r.Body)

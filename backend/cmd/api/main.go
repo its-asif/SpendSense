@@ -21,7 +21,7 @@ func main() {
 		port = "8080"
 	}
 
-	databaseURL := os.Getenv("DATABASE_URL")	
+	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		log.Fatal("DATABASE_URL is required")
 	}

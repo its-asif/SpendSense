@@ -41,3 +41,12 @@ func (db *Database) ValidateRefreshToken(ctx context.Context, userID uuid.UUID, 
 	}
 	return valid, nil
 }
+
+// DeleteRefreshToken removes a stored refresh token for a user
+func (db *Database) DeleteRefreshToken(ctx context.Context, userID uuid.UUID, token string) error {
+	tokenHash := hashToken(token)
+	_, err := db.pool.Exec(ctx, `
+		DELETE FROM refresh_tokens WHERE user_id = $1 AND token_hash = $2
+	`, userID, tokenHash)
+	return err
+}

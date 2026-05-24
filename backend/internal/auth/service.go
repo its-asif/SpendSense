@@ -16,6 +16,7 @@ type UserStore interface {
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 	StoreRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresInHours int) error
 	ValidateRefreshToken(ctx context.Context, userID uuid.UUID, token string) (bool, error)
+	DeleteRefreshToken(ctx context.Context, userID uuid.UUID, token string) error
 }
 
 type AuthService struct {
@@ -132,4 +133,12 @@ func (as *AuthService) RefreshAccessToken(ctx context.Context, userID uuid.UUID,
 	}
 
 	return accessToken, nil
+}
+
+// Logout removes a refresh token so it can no longer be used
+func (as *AuthService) Logout(ctx context.Context, userID uuid.UUID, refreshToken string) error {
+	if err := as.db.DeleteRefreshToken(ctx, userID, refreshToken); err != nil {
+		return domain.NewDomainError(domain.ErrInternal, "Failed to delete refresh token", 500)
+	}
+	return nil
 }
