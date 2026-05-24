@@ -75,8 +75,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/auth/login", s.handleLogin)
 	s.mux.HandleFunc("/auth/refresh", s.handleRefresh)
 	s.mux.Handle("/auth/logout", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleLogout)))
+	s.mux.Handle("/auth/logout-all", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleLogoutAll)))
 	s.mux.Handle("/auth/me", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleMe)))
+	s.mux.Handle("/ops/refresh-tokens/cleanup", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleCleanupRefreshTokens)))
 	s.registerExpenseRoutes()
+	s.registerIncomeRoutes()
 	s.registerWalletRoutes()
 	s.registerCategoryRoutes()
 }
@@ -191,7 +194,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct{
+	var req struct {
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
@@ -212,13 +215,47 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+func (s *Server) handleLogoutAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeStatusError(w, http.StatusUnauthorized, string(domain.ErrUnauthorized), "Unauthorized")
+		return
+	}
+
+	if err := s.authService.LogoutAllSessions(r.Context(), userID); err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) handleCleanupRefreshTokens(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	deleted, err := s.authService.CleanupExpiredRefreshTokens(r.Context())
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": deleted})
+}
 
 /*
-	Decodes JSON from the request body into the provided destination struct.
-	
-	- dst should be a pointer to a struct where the decoded data will be stored.
-	- The request body is limited to 1MB to prevent abuse.
-	- Unknown fields in the JSON will cause an error, ensuring that only expected data is processed.
+Decodes JSON from the request body into the provided destination struct.
+
+- dst should be a pointer to a struct where the decoded data will be stored.
+- The request body is limited to 1MB to prevent abuse.
+- Unknown fields in the JSON will cause an error, ensuring that only expected data is processed.
 */
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	defer r.Body.Close()

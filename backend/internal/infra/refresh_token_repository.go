@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,4 +50,29 @@ func (db *Database) DeleteRefreshToken(ctx context.Context, userID uuid.UUID, to
 		DELETE FROM refresh_tokens WHERE user_id = $1 AND token_hash = $2
 	`, userID, tokenHash)
 	return err
+}
+
+// DeleteAllRefreshTokens removes all stored refresh tokens for a user.
+func (db *Database) DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := db.pool.Exec(ctx, `
+		DELETE FROM refresh_tokens WHERE user_id = $1
+	`, userID)
+	return err
+}
+
+// DeleteExpiredRefreshTokens removes expired refresh tokens and returns deleted rows.
+func (db *Database) DeleteExpiredRefreshTokens(ctx context.Context) (int64, error) {
+	tag, err := db.pool.Exec(ctx, `
+		DELETE FROM refresh_tokens WHERE expires_at <= NOW()
+	`)
+	if err != nil {
+		return 0, err
+	}
+
+	deleted := tag.RowsAffected()
+	if deleted < 0 {
+		return 0, fmt.Errorf("invalid rows affected: %d", deleted)
+	}
+
+	return deleted, nil
 }

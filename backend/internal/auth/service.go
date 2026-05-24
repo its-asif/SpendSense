@@ -17,6 +17,8 @@ type UserStore interface {
 	StoreRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresInHours int) error
 	ValidateRefreshToken(ctx context.Context, userID uuid.UUID, token string) (bool, error)
 	DeleteRefreshToken(ctx context.Context, userID uuid.UUID, token string) error
+	DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	DeleteExpiredRefreshTokens(ctx context.Context) (int64, error)
 }
 
 type AuthService struct {
@@ -141,4 +143,21 @@ func (as *AuthService) Logout(ctx context.Context, userID uuid.UUID, refreshToke
 		return domain.NewDomainError(domain.ErrInternal, "Failed to delete refresh token", 500)
 	}
 	return nil
+}
+
+// LogoutAllSessions revokes all refresh tokens for a user.
+func (as *AuthService) LogoutAllSessions(ctx context.Context, userID uuid.UUID) error {
+	if err := as.db.DeleteAllRefreshTokens(ctx, userID); err != nil {
+		return domain.NewDomainError(domain.ErrInternal, "Failed to delete user refresh tokens", 500)
+	}
+	return nil
+}
+
+// CleanupExpiredRefreshTokens removes expired refresh tokens and returns deleted rows.
+func (as *AuthService) CleanupExpiredRefreshTokens(ctx context.Context) (int64, error) {
+	deleted, err := as.db.DeleteExpiredRefreshTokens(ctx)
+	if err != nil {
+		return 0, domain.NewDomainError(domain.ErrInternal, "Failed to cleanup expired refresh tokens", 500)
+	}
+	return deleted, nil
 }

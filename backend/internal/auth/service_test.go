@@ -15,6 +15,7 @@ import (
 type mockStore struct {
 	users         map[string]*domain.User
 	storedRefresh map[string]string
+	cleanupRuns   int
 }
 
 func newMockStore() *mockStore {
@@ -61,6 +62,23 @@ func (m *mockStore) ValidateRefreshToken(ctx context.Context, userID uuid.UUID, 
 		}
 	}
 	return false, nil
+}
+
+func (m *mockStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID, token string) error {
+	if t, ok := m.storedRefresh[userID.String()]; ok && t == token {
+		delete(m.storedRefresh, userID.String())
+	}
+	return nil
+}
+
+func (m *mockStore) DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	delete(m.storedRefresh, userID.String())
+	return nil
+}
+
+func (m *mockStore) DeleteExpiredRefreshTokens(ctx context.Context) (int64, error) {
+	m.cleanupRuns++
+	return 0, nil
 }
 
 func TestRegisterAndLoginFlow(t *testing.T) {
@@ -118,6 +136,36 @@ func TestRegisterAndLoginFlow(t *testing.T) {
 	// ensure tokens are valid JWTs
 	if _, err := jm.VerifyToken(lresp.AccessToken); err != nil {
 		t.Fatalf("access token verification failed: %v", err)
+	}
+
+	if err := svc.Logout(context.Background(), uid, lresp.RefreshToken); err != nil {
+		t.Fatalf("logout failed: %v", err)
+	}
+
+	if valid, _ := store.ValidateRefreshToken(context.Background(), uid, lresp.RefreshToken); valid {
+		t.Fatalf("expected refresh token to be revoked after logout")
+	}
+
+	// create another token then revoke all
+	lresp2, err := svc.Login(context.Background(), "alice@example.com", "strongpassword")
+	if err != nil {
+		t.Fatalf("second login failed: %v", err)
+	}
+
+	if err := svc.LogoutAllSessions(context.Background(), uid); err != nil {
+		t.Fatalf("logout all sessions failed: %v", err)
+	}
+
+	if valid, _ := store.ValidateRefreshToken(context.Background(), uid, lresp2.RefreshToken); valid {
+		t.Fatalf("expected refresh token to be revoked after logout-all")
+	}
+
+	if _, err := svc.CleanupExpiredRefreshTokens(context.Background()); err != nil {
+		t.Fatalf("cleanup expired refresh tokens failed: %v", err)
+	}
+
+	if store.cleanupRuns == 0 {
+		t.Fatalf("expected cleanup to be invoked")
 	}
 
 	// small timing sanity
