@@ -2,21 +2,30 @@ package expense
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 
+	"spendsense-backend/internal/currency"
 	"spendsense-backend/internal/domain"
+	"spendsense-backend/internal/wallet"
 
 	"github.com/google/uuid"
 )
 
 type Service struct {
-	repo Store
-	now  func() time.Time
+	repo         Store
+	walletLookup walletLookup
+	currencySvc  *currency.Service
+	now          func() time.Time
 }
 
-func NewService(repo Store) *Service {
-	return &Service{repo: repo, now: time.Now}
+type walletLookup interface {
+	GetWalletByID(ctx context.Context, userID, id uuid.UUID) (*wallet.Wallet, error)
+}
+
+func NewService(repo Store, walletLookup walletLookup, currencySvc *currency.Service) *Service {
+	return &Service{repo: repo, walletLookup: walletLookup, currencySvc: currencySvc, now: time.Now}
 }
 
 func (s *Service) CreateExpense(ctx context.Context, userID uuid.UUID, req CreateRequest) (*Expense, error) {
@@ -26,6 +35,9 @@ func (s *Service) CreateExpense(ctx context.Context, userID uuid.UUID, req Creat
 
 	validated, err := normalizeCreateRequest(req, s.now())
 	if err != nil {
+		return nil, err
+	}
+	if err := s.normalizeCurrency(ctx, userID, validated); err != nil {
 		return nil, err
 	}
 
@@ -59,7 +71,7 @@ func (s *Service) GetExpense(ctx context.Context, userID, expenseID uuid.UUID) (
 	return s.repo.GetExpenseByID(ctx, userID, expenseID)
 }
 
-func (s *Service) ListExpenses(ctx context.Context, userID uuid.UUID, limit int, cursor string) ([]*Expense, string, error) {
+func (s *Service) ListExpenses(ctx context.Context, userID uuid.UUID, limit int, pagination string, from, to *time.Time, categoryID *uuid.UUID) ([]*Expense, string, error) {
 	if userID == uuid.Nil {
 		return nil, "", domain.NewDomainError(domain.ErrUnauthorized, "user is required", 401)
 	}
@@ -70,21 +82,21 @@ func (s *Service) ListExpenses(ctx context.Context, userID uuid.UUID, limit int,
 		limit = 100
 	}
 
-	decodedCursor, err := DecodeCursor(cursor)
+	decodedPagination, err := DecodePagination(pagination)
 	if err != nil {
-		return nil, "", domain.NewDomainError(domain.ErrInvalidCursor, "invalid cursor", 400)
+		return nil, "", domain.NewDomainError(domain.ErrInvalidPagination, "invalid pagination", 400)
 	}
 
-	expenses, nextCursor, err := s.repo.ListExpenses(ctx, userID, limit, decodedCursor)
+	expenses, nextPagination, err := s.repo.ListExpenses(ctx, userID, limit, decodedPagination, from, to, categoryID)
 	if err != nil {
 		return nil, "", err
 	}
 
-	if nextCursor == nil {
+	if nextPagination == nil {
 		return expenses, "", nil
 	}
 
-	return expenses, nextCursor.Encode(), nil
+	return expenses, nextPagination.Encode(), nil
 }
 
 func (s *Service) UpdateExpense(ctx context.Context, userID, expenseID uuid.UUID, req UpdateRequest) (*Expense, error) {
@@ -96,22 +108,24 @@ func (s *Service) UpdateExpense(ctx context.Context, userID, expenseID uuid.UUID
 	if err != nil {
 		return nil, err
 	}
-
-	expense, err := s.repo.GetExpenseByID(ctx, userID, expenseID)
-	if err != nil {
+	if err := s.normalizeCurrency(ctx, userID, validated); err != nil {
 		return nil, err
 	}
 
-	expense.WalletID = validated.WalletID
-	expense.Amount = validated.Amount
-	expense.Currency = validated.Currency
-	expense.FXRateToBase = validated.FXRateToBase
-	expense.CategoryID = validated.CategoryID
-	expense.Merchant = validated.Merchant
-	expense.Date = validated.Date
-	expense.Notes = validated.Notes
-	expense.IsRecurring = validated.IsRecurring
-	expense.RecurringRule = validated.RecurringRule
+	expense := &Expense{
+		ID:            expenseID,
+		UserID:        userID,
+		WalletID:      validated.WalletID,
+		Amount:        validated.Amount,
+		Currency:      validated.Currency,
+		FXRateToBase:  validated.FXRateToBase,
+		CategoryID:    validated.CategoryID,
+		Merchant:      validated.Merchant,
+		Date:          validated.Date,
+		Notes:         validated.Notes,
+		IsRecurring:   validated.IsRecurring,
+		RecurringRule: validated.RecurringRule,
+	}
 
 	if err := s.repo.UpdateExpense(ctx, expense); err != nil {
 		return nil, err
@@ -139,6 +153,49 @@ type normalizedExpenseFields struct {
 	Notes         *string
 	IsRecurring   bool
 	RecurringRule *string
+}
+
+func (s *Service) normalizeCurrency(ctx context.Context, userID uuid.UUID, normalized *normalizedExpenseFields) error {
+	if s.walletLookup == nil || s.currencySvc == nil {
+		normalized.Currency = strings.ToUpper(strings.TrimSpace(normalized.Currency))
+		if normalized.Currency == "" {
+			normalized.Currency = "USD"
+		}
+		return nil
+	}
+
+	walletObj, err := s.walletLookup.GetWalletByID(ctx, userID, normalized.WalletID)
+	if err != nil {
+		return err
+	}
+	if walletObj == nil {
+		return domain.NewDomainError(domain.ErrNotFound, "wallet not found", 404)
+	}
+
+	walletCurrency, err := s.currencySvc.NormalizeOrDefault(walletObj.Currency, walletObj.WalletType, walletObj.Provider)
+	if err != nil {
+		return domain.NewDomainError(domain.ErrInvalidCurrency, err.Error(), 400)
+	}
+
+	sourceCurrency := strings.ToUpper(strings.TrimSpace(normalized.Currency))
+	if sourceCurrency == "" {
+		sourceCurrency = walletCurrency
+	}
+	if sourceCurrency != walletCurrency {
+		convertedAmount, rate, err := s.currencySvc.Convert(ctx, normalized.Amount, sourceCurrency, walletCurrency)
+		if err != nil {
+			return domain.NewDomainError(domain.ErrInvalidCurrency, err.Error(), 400)
+		}
+		normalized.Amount = convertedAmount
+		normalized.FXRateToBase = rate
+	} else {
+		normalized.FXRateToBase = 1
+	}
+
+	normalized.Amount = round2(normalized.Amount)
+	normalized.FXRateToBase = round2(normalized.FXRateToBase)
+	normalized.Currency = walletCurrency
+	return nil
 }
 
 func normalizeCreateRequest(req CreateRequest, now time.Time) (*normalizedExpenseFields, error) {
@@ -182,6 +239,7 @@ func normalizeExpenseFields(normalized normalizedExpenseFields, now time.Time) (
 	if normalized.Amount <= 0 {
 		return nil, domain.NewDomainError(domain.ErrInvalidAmount, "amount must be greater than zero", 400)
 	}
+	normalized.Amount = round2(normalized.Amount)
 
 	dateOnly := stripTime(now)
 	expenseDate := stripTime(normalized.Date)
@@ -204,6 +262,7 @@ func normalizeExpenseFields(normalized normalizedExpenseFields, now time.Time) (
 	if normalized.FXRateToBase <= 0 {
 		normalized.FXRateToBase = 1
 	}
+	normalized.FXRateToBase = round2(normalized.FXRateToBase)
 
 	if normalized.Merchant != nil {
 		trimmed := strings.TrimSpace(*normalized.Merchant)
@@ -242,4 +301,8 @@ func stripTime(value time.Time) time.Time {
 	}
 
 	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func round2(value float64) float64 {
+	return math.Round(value*100) / 100
 }

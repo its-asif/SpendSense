@@ -31,9 +31,9 @@ func TestAuthAndIncomeFlow(t *testing.T) {
 	ctx := context.Background()
 
 	authSvc := auth.NewAuthService(db, auth.NewJWTManager("integration-test-secret"))
-	walletSvc := wallet.NewService(wallet.NewRepository(db))
+	walletSvc := wallet.NewService(wallet.NewRepository(db), nil)
 	categorySvc := category.NewService(category.NewRepository(db))
-	incomeSvc := income.NewService(income.NewRepository(db))
+	incomeSvc := income.NewService(income.NewRepository(db), wallet.NewRepository(db), nil)
 
 	uniqueEmail := fmt.Sprintf("integration-%s@example.com", uuid.NewString())
 	registerResp, err := authSvc.Register(ctx, auth.RegisterRequest{
@@ -85,12 +85,32 @@ func TestAuthAndIncomeFlow(t *testing.T) {
 		t.Fatalf("expected created income ID")
 	}
 
-	incomes, nextCursor, err := incomeSvc.ListIncomes(ctx, userID, 20, "")
+	updatedWallet, err := walletSvc.GetWallet(ctx, userID, createdWallet.ID)
+	if err != nil {
+		t.Fatalf("get wallet after income create failed: %v", err)
+	}
+	if updatedWallet.CurrentBalance != 3500 {
+		t.Fatalf("expected wallet balance to increase to 3500, got %v", updatedWallet.CurrentBalance)
+	}
+
+	if err := incomeSvc.SoftDeleteIncome(ctx, userID, createdIncome.ID); err != nil {
+		t.Fatalf("delete income failed: %v", err)
+	}
+
+	restoredWallet, err := walletSvc.GetWallet(ctx, userID, createdWallet.ID)
+	if err != nil {
+		t.Fatalf("get wallet after income delete failed: %v", err)
+	}
+	if restoredWallet.CurrentBalance != 1000 {
+		t.Fatalf("expected wallet balance to restore to 1000, got %v", restoredWallet.CurrentBalance)
+	}
+
+	incomes, nextPagination, err := incomeSvc.ListIncomes(ctx, userID, 20, "")
 	if err != nil {
 		t.Fatalf("list incomes failed: %v", err)
 	}
-	if nextCursor != "" && len(incomes) == 0 {
-		t.Fatalf("unexpected non-empty next cursor with empty list")
+	if nextPagination != "" && len(incomes) == 0 {
+		t.Fatalf("unexpected non-empty next pagination with empty list")
 	}
 
 	found := false
@@ -100,7 +120,7 @@ func TestAuthAndIncomeFlow(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Fatalf("created income was not found in list response")
+	if found {
+		t.Fatalf("deleted income should not be returned in list response")
 	}
 }

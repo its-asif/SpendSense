@@ -100,8 +100,8 @@ Expenses
     }
     ```
 
-- GET /api/v1/expenses?limit=20&cursor=<cursor>
-  - Query params: `limit` (int), `cursor` (opaque)
+- GET /api/v1/expenses?limit=20&pagination=<pagination>
+  - Query params: `limit` (int), `pagination` (opaque)
 
 - GET /api/v1/expenses/:id
   - Response: expense object
@@ -166,7 +166,7 @@ Incomes
     }
     ```
 
-- GET /api/v1/incomes?limit=20&cursor=<cursor>
+- GET /api/v1/incomes?limit=20&pagination=<pagination>
 - GET /api/v1/incomes/:id
 - PUT /api/v1/incomes/:id
 - DELETE /api/v1/incomes/:id
@@ -179,3 +179,38 @@ Notes
 - If you run the server locally, Swagger UI is available at `/api/docs` when enabled.
 
 If you want the examples in a different format (OpenAPI YAML/JSON or Postman collection), tell me which format and I'll generate it.
+
+Developer: OpenAPI & Swagger
+--------------------------------
+
+- Regenerate Go types from the OpenAPI YAML (committed spec):
+  - From the repository root run:
+
+```bash
+cd backend
+make openapi
+```
+
+  - This generates the Go types package at [backend/internal/httpapi/openapi/types.gen.go](backend/internal/httpapi/openapi/types.gen.go#L1).
+
+- Run the backend and view Swagger UI:
+  - Start the server (example):
+
+```bash
+cd backend
+go run ./cmd/api
+```
+
+  - Open the API docs in your browser: http://localhost:8080/api/docs
+  - The raw spec is served at: http://localhost:8080/openapi.yaml
+
+- Troubleshooting / dependencies:
+  - The generator uses `oapi-codegen` and the runtime helper. If you run into missing packages, run:
+
+```bash
+cd backend
+go get github.com/oapi-codegen/runtime@latest
+```
+
+  - The `make openapi` target runs the generator with `go run`, so you usually don't need to install the generator globally.
+

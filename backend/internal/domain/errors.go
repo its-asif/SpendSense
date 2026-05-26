@@ -13,12 +13,12 @@ const (
 	ErrForbidden      ErrorCode = "FORBIDDEN"
 
 	// Validation errors
-	ErrInvalidAmount   ErrorCode = "INVALID_AMOUNT"
-	ErrInvalidDate     ErrorCode = "INVALID_DATE"
-	ErrInvalidCategory ErrorCode = "INVALID_CATEGORY"
-	ErrInvalidWallet   ErrorCode = "INVALID_WALLET"
-	ErrInvalidCurrency ErrorCode = "INVALID_CURRENCY"
-	ErrInvalidCursor   ErrorCode = "INVALID_CURSOR"
+	ErrInvalidAmount     ErrorCode = "INVALID_AMOUNT"
+	ErrInvalidDate       ErrorCode = "INVALID_DATE"
+	ErrInvalidCategory   ErrorCode = "INVALID_CATEGORY"
+	ErrInvalidWallet     ErrorCode = "INVALID_WALLET"
+	ErrInvalidCurrency   ErrorCode = "INVALID_CURRENCY"
+	ErrInvalidPagination ErrorCode = "INVALID_PAGINATION"
 
 	// Resource errors
 	ErrNotFound      ErrorCode = "NOT_FOUND"

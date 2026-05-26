@@ -46,17 +46,17 @@ type UpdateRequest struct {
 	Notes      *string
 }
 
-type Cursor struct {
+type Pagination struct {
 	CreatedAt time.Time `json:"created_at"`
 	ID        uuid.UUID `json:"id"`
 }
 
-func (c Cursor) Encode() string {
-	if c.CreatedAt.IsZero() || c.ID == uuid.Nil {
+func (p Pagination) Encode() string {
+	if p.CreatedAt.IsZero() || p.ID == uuid.Nil {
 		return ""
 	}
 
-	data, err := json.Marshal(c)
+	data, err := json.Marshal(p)
 	if err != nil {
 		return ""
 	}
@@ -64,7 +64,7 @@ func (c Cursor) Encode() string {
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
-func DecodeCursor(value string) (*Cursor, error) {
+func DecodePagination(value string) (*Pagination, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return nil, nil
@@ -75,14 +75,14 @@ func DecodeCursor(value string) (*Cursor, error) {
 		return nil, err
 	}
 
-	var cursor Cursor
-	if err := json.Unmarshal(decoded, &cursor); err != nil {
+	var pagination Pagination
+	if err := json.Unmarshal(decoded, &pagination); err != nil {
 		return nil, err
 	}
 
-	if cursor.CreatedAt.IsZero() || cursor.ID == uuid.Nil {
-		return nil, fmt.Errorf("invalid cursor")
+	if pagination.CreatedAt.IsZero() || pagination.ID == uuid.Nil {
+		return nil, fmt.Errorf("invalid pagination")
 	}
 
-	return &cursor, nil
+	return &pagination, nil
 }

@@ -69,14 +69,26 @@ type currentUserResponse struct {
 	Email  string `json:"email"`
 }
 
+type updateUserPreferencesRequest struct {
+	BaseCurrency string `json:"base_currency"`
+	Timezone     string `json:"timezone"`
+	Locale       string `json:"locale"`
+}
+
 func (s *Server) routes() {
 	s.mux.HandleFunc("/health", handleHealth)
+	s.mux.HandleFunc("/openapi.yaml", s.handleOpenAPISpec)
+	s.mux.HandleFunc("/api/docs", s.handleSwaggerUI)
+	s.mux.HandleFunc("/api/v1/currencies", s.handleCurrencyList)
+	s.mux.HandleFunc("/api/v1/currencies/convert", s.handleCurrencyConvert)
+	s.registerDashboardRoutes()
 	s.mux.HandleFunc("/auth/register", s.handleRegister)
 	s.mux.HandleFunc("/auth/login", s.handleLogin)
 	s.mux.HandleFunc("/auth/refresh", s.handleRefresh)
 	s.mux.Handle("/auth/logout", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleLogout)))
 	s.mux.Handle("/auth/logout-all", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleLogoutAll)))
 	s.mux.Handle("/auth/me", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleMe)))
+	s.mux.Handle("/auth/me/preferences", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleUpdateMePreferences)))
 	s.mux.Handle("/ops/refresh-tokens/cleanup", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleCleanupRefreshTokens)))
 	s.registerExpenseRoutes()
 	s.registerIncomeRoutes()
@@ -169,6 +181,11 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		writeStatusError(w, http.StatusInternalServerError, string(domain.ErrInternal), "Missing authenticated user")
@@ -180,6 +197,33 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		UserID: userID.String(),
 		Email:  email,
 	})
+}
+
+func (s *Server) handleUpdateMePreferences(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeStatusError(w, http.StatusUnauthorized, string(domain.ErrUnauthorized), "Unauthorized")
+		return
+	}
+
+	var req updateUserPreferencesRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeRequestError(w, err)
+		return
+	}
+
+	updated, err := s.authService.UpdateUserPreferences(r.Context(), userID, req.BaseCurrency, req.Timezone, req.Locale)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, toUserResponse(updated))
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

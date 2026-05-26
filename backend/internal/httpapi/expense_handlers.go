@@ -13,6 +13,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const expenseDateFormat = "2006-01-02"
+
 type createExpenseRequest struct {
 	WalletID      string  `json:"wallet_id"`
 	Amount        float64 `json:"amount"`
@@ -97,9 +99,34 @@ func (s *Server) handleCreateListExpenses(w http.ResponseWriter, r *http.Request
 				limit = v
 			}
 		}
-		cursor := q.Get("cursor")
+		pagination := q.Get("pagination")
 
-		list, next, err := s.expenseService.ListExpenses(r.Context(), userID, limit, cursor)
+		from, err := parseOptionalExpenseDate(q.Get("from"))
+		if err != nil {
+			writeStatusError(w, http.StatusBadRequest, "INVALID_FROM_DATE", "from must use YYYY-MM-DD")
+			return
+		}
+		to, err := parseOptionalExpenseDate(q.Get("to"))
+		if err != nil {
+			writeStatusError(w, http.StatusBadRequest, "INVALID_TO_DATE", "to must use YYYY-MM-DD")
+			return
+		}
+		if from != nil && to != nil && from.After(*to) {
+			writeStatusError(w, http.StatusBadRequest, "INVALID_DATE_RANGE", "from must be on or before to")
+			return
+		}
+
+		var categoryID *uuid.UUID
+		if value := strings.TrimSpace(q.Get("category_id")); value != "" {
+			parsed, err := uuid.Parse(value)
+			if err != nil {
+				writeStatusError(w, http.StatusBadRequest, "INVALID_CATEGORY_ID", "category_id must be a valid UUID")
+				return
+			}
+			categoryID = &parsed
+		}
+
+		list, next, err := s.expenseService.ListExpenses(r.Context(), userID, limit, pagination, from, to, categoryID)
 		if err != nil {
 			writeError(w, err)
 			return
@@ -110,12 +137,27 @@ func (s *Server) handleCreateListExpenses(w http.ResponseWriter, r *http.Request
 			resp = append(resp, toExpenseResponse(e))
 		}
 
-		writeJSON(w, http.StatusOK, map[string]any{"expenses": resp, "next_cursor": next})
+		writeJSON(w, http.StatusOK, map[string]any{"expenses": resp, "next_pagination": next})
 		return
 	default:
 		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 		return
 	}
+}
+
+func parseOptionalExpenseDate(value string) (*time.Time, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	parsed, err := time.Parse(expenseDateFormat, trimmed)
+	if err != nil {
+		return nil, err
+	}
+
+	dateOnly := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+	return &dateOnly, nil
 }
 
 func (s *Server) handleExpenseByID(w http.ResponseWriter, r *http.Request) {

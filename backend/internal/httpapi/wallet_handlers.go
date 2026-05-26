@@ -39,6 +39,7 @@ type walletResponse struct {
 func (s *Server) registerWalletRoutes() {
 	s.mux.Handle("/api/v1/wallets", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleCreateListWallets)))
 	s.mux.Handle("/api/v1/wallets/", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleWalletByID)))
+	s.mux.Handle("/api/v1/wallets/transfer", s.authMiddleware.RequireAuth(http.HandlerFunc(s.handleWalletTransfer)))
 }
 
 func (s *Server) handleCreateListWallets(w http.ResponseWriter, r *http.Request) {
@@ -139,4 +140,63 @@ func toWalletResponse(wObj *wallet.Wallet) walletResponse {
 		Currency: wObj.Currency, OpeningBalance: wObj.OpeningBalance, CurrentBalance: wObj.CurrentBalance, IsActive: wObj.IsActive,
 		CreatedAt: wObj.CreatedAt.Format(time.RFC3339), UpdatedAt: wObj.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+type walletTransferRequest struct {
+	FromWalletID string  `json:"from_wallet_id"`
+	ToWalletID   string  `json:"to_wallet_id"`
+	Amount       float64 `json:"amount"`
+	ExchangeRate float64 `json:"exchange_rate,omitempty"`
+	FeeAmount    float64 `json:"fee_amount"`
+	Currency     string  `json:"currency"`
+	TransferDate string  `json:"transfer_date"`
+	Notes        *string `json:"notes,omitempty"`
+}
+
+func (s *Server) handleWalletTransfer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		return
+	}
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeStatusError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		return
+	}
+
+	var req walletTransferRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeRequestError(w, err)
+		return
+	}
+
+	fromID, err := uuid.Parse(req.FromWalletID)
+	if err != nil {
+		writeStatusError(w, http.StatusBadRequest, "INVALID_ID", "invalid from_wallet_id")
+		return
+	}
+	toID, err := uuid.Parse(req.ToWalletID)
+	if err != nil {
+		writeStatusError(w, http.StatusBadRequest, "INVALID_ID", "invalid to_wallet_id")
+		return
+	}
+
+	t, err := s.walletService.Transfer(r.Context(), userID, wallet.CreateTransferRequest{
+		FromWalletID: fromID,
+		ToWalletID:   toID,
+		Amount:       req.Amount,
+		ExchangeRate: req.ExchangeRate,
+		FeeAmount:    req.FeeAmount,
+		Currency:     req.Currency,
+		TransferDate: req.TransferDate,
+		Notes:        req.Notes,
+	})
+
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{"id": t.ID.String(), "created_at": t.CreatedAt.Format(time.RFC3339)})
 }

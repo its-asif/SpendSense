@@ -11,6 +11,127 @@ import (
 	"github.com/google/uuid"
 )
 
+type fakeUserStore struct {
+	users         map[string]*domain.User
+	storedRefresh string
+}
+
+func (f *fakeUserStore) CreateUser(ctx context.Context, user *domain.User) error {
+	f.users[user.Email] = user
+	return nil
+}
+func (f *fakeUserStore) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	if u, ok := f.users[email]; ok {
+		return u, nil
+	}
+	return nil, nil
+}
+func (f *fakeUserStore) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	for _, u := range f.users {
+		if u.ID == userID {
+			return u, nil
+		}
+	}
+	return nil, nil
+}
+func (f *fakeUserStore) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, baseCurrency, timezone, locale string) (*domain.User, error) {
+	for _, u := range f.users {
+		if u.ID == userID {
+			u.BaseCurrency = baseCurrency
+			u.Timezone = timezone
+			u.Locale = locale
+			return u, nil
+		}
+	}
+	return nil, nil
+}
+func (f *fakeUserStore) StoreRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresInHours int) error {
+	f.storedRefresh = token
+	return nil
+}
+func (f *fakeUserStore) ValidateRefreshToken(ctx context.Context, userID uuid.UUID, token string) (bool, error) {
+	return f.storedRefresh == token, nil
+}
+func (f *fakeUserStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID, token string) error {
+	return nil
+}
+func (f *fakeUserStore) DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	return nil
+}
+func (f *fakeUserStore) DeleteExpiredRefreshTokens(ctx context.Context) (int64, error) { return 0, nil }
+
+type fakeJWT struct{}
+
+func (f *fakeJWT) GenerateAccessToken(userID uuid.UUID, email string) (string, error) {
+	return "access", nil
+}
+func (f *fakeJWT) GenerateRefreshToken() string { return "refresh" }
+
+func TestRegisterAndLogin(t *testing.T) {
+	store := &fakeUserStore{users: map[string]*domain.User{}}
+	jm := &JWTManager{jwtSecret: "testsecret"}
+	svc := NewAuthService(store, jm)
+
+	// register
+	resp, err := svc.Register(context.Background(), RegisterRequest{Email: "u@example.com", Password: "strongpass"})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+	if resp.User == nil || resp.User.Email != "u@example.com" {
+		t.Fatalf("unexpected user: %+v", resp.User)
+	}
+
+	// login - correct password
+	loginResp, err := svc.Login(context.Background(), "u@example.com", "strongpass")
+	if err != nil {
+		t.Fatalf("login failed: %v", err)
+	}
+	if loginResp.AccessToken == "" {
+		t.Fatalf("missing access token")
+	}
+
+	// login - wrong password
+	_, err = svc.Login(context.Background(), "u@example.com", "badpass")
+	if err == nil {
+		t.Fatalf("expected login failure with bad password")
+	}
+	if de, ok := err.(*domain.DomainError); !ok || de.Code != domain.ErrUnauthorized {
+		t.Fatalf("expected unauthorized error, got %v", err)
+	}
+
+	// refresh token validation (use token from login response)
+	uid := resp.User.ID
+	at, err := svc.RefreshAccessToken(context.Background(), uid, loginResp.RefreshToken)
+	if err != nil {
+		t.Fatalf("refresh failed: %v", err)
+	}
+	if at == "" {
+		t.Fatalf("refresh returned empty token")
+	}
+
+	// cleanup
+	_, err = svc.CleanupExpiredRefreshTokens(context.Background())
+	if err != nil {
+		t.Fatalf("cleanup failed: %v", err)
+	}
+
+	// logout all
+	if err := svc.LogoutAllSessions(context.Background(), uid); err != nil {
+		t.Fatalf("logout all failed: %v", err)
+	}
+
+	// ensure created user has timestamps
+	if resp.User.CreatedAt.IsZero() || resp.User.UpdatedAt.IsZero() {
+		t.Fatalf("timestamps not set: %+v", resp.User)
+	}
+
+	// Register with weak password
+	_, err = svc.Register(context.Background(), RegisterRequest{Email: "u2@example.com", Password: "short"})
+	if err == nil {
+		t.Fatalf("expected weak password error")
+	}
+}
+
 // simple in-memory mock store
 type mockStore struct {
 	users         map[string]*domain.User
@@ -40,6 +161,18 @@ func (m *mockStore) GetUserByEmail(ctx context.Context, email string) (*domain.U
 func (m *mockStore) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
 	for _, u := range m.users {
 		if u.ID == userID {
+			return u, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockStore) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, baseCurrency, timezone, locale string) (*domain.User, error) {
+	for _, u := range m.users {
+		if u.ID == userID {
+			u.BaseCurrency = baseCurrency
+			u.Timezone = timezone
+			u.Locale = locale
 			return u, nil
 		}
 	}

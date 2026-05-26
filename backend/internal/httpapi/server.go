@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"spendsense-backend/internal/auth"
 	"spendsense-backend/internal/category"
+	"spendsense-backend/internal/currency"
 	"spendsense-backend/internal/expense"
 	"spendsense-backend/internal/income"
 	"spendsense-backend/internal/infra"
 	"spendsense-backend/internal/middleware"
+	"spendsense-backend/internal/report"
 	"spendsense-backend/internal/wallet"
 )
 
@@ -26,6 +30,9 @@ type Server struct {
 	incomeService   *income.Service
 	walletService   *wallet.Service
 	categoryService *category.Service
+	reportService   *report.Service
+	currencyService *currency.Service
+	redisCache      *infra.Redis
 	httpServer      *http.Server
 	cleanupCancel   context.CancelFunc
 	shutdownOnce    sync.Once
@@ -37,15 +44,31 @@ func NewServer(databaseURL, jwtSecret string) (*Server, error) {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	var redisCache *infra.Redis
+	if redisURL := strings.TrimSpace(os.Getenv("REDIS_URL")); redisURL != "" {
+		redisCache, err = infra.NewRedis(redisURL)
+		if err != nil {
+			log.Printf("redis unavailable, continuing without cache: %v", err)
+		}
+	}
+
+	currencyService, err := currency.NewService(redisCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize currency service: %w", err)
+	}
+
 	server := &Server{
 		db:              db,
 		authService:     auth.NewAuthService(db, auth.NewJWTManager(jwtSecret)),
 		authMiddleware:  middleware.NewAuthMiddleware(auth.NewJWTManager(jwtSecret)),
 		mux:             http.NewServeMux(),
-		expenseService:  expense.NewService(expense.NewRepository(db)),
-		incomeService:   income.NewService(income.NewRepository(db)),
-		walletService:   wallet.NewService(wallet.NewRepository(db)),
+		expenseService:  expense.NewService(expense.NewRepository(db), wallet.NewRepository(db), currencyService),
+		incomeService:   income.NewService(income.NewRepository(db), wallet.NewRepository(db), currencyService),
+		walletService:   wallet.NewService(wallet.NewRepository(db), currencyService),
 		categoryService: category.NewService(category.NewRepository(db)),
+		reportService:   report.NewService(db, currencyService),
+		currencyService: currencyService,
+		redisCache:      redisCache,
 	}
 
 	server.routes()
@@ -57,11 +80,15 @@ func (s *Server) Start(port string) error {
 	s.cleanupCancel = cancelCleanup
 	go s.startRefreshTokenCleanupJob(cleanupCtx, time.Hour)
 
+	allowedOrigins := parseAllowedOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
+
 	s.httpServer = &http.Server{
 		Addr: ":" + port,
 		Handler: middleware.Recoverer(
 			middleware.RequestLogger(
-				middleware.NewRateLimiter(180, time.Minute).Middleware(s.mux),
+				middleware.CORS(allowedOrigins)(
+					middleware.NewRateLimiter(180, time.Minute).Middleware(s.mux),
+				),
 			),
 		),
 		ReadTimeout:  5 * time.Second,
@@ -76,6 +103,28 @@ func (s *Server) Start(port string) error {
 	return nil
 }
 
+func parseAllowedOrigins(value string) []string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return []string{"http://localhost:5173"}
+	}
+
+	parts := strings.Split(trimmed, ",")
+	origins := make([]string, 0, len(parts))
+	for _, part := range parts {
+		origin := strings.TrimSpace(part)
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+
+	if len(origins) == 0 {
+		return []string{"http://localhost:5173"}
+	}
+
+	return origins
+}
+
 func (s *Server) Shutdown(ctx context.Context) error {
 	var shutdownErr error
 	s.shutdownOnce.Do(func() {
@@ -87,6 +136,10 @@ func (s *Server) Shutdown(ctx context.Context) error {
 			if err := s.httpServer.Shutdown(ctx); err != nil {
 				shutdownErr = err
 			}
+		}
+
+		if s.redisCache != nil {
+			_ = s.redisCache.Close()
 		}
 
 		s.db.Close()

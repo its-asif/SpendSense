@@ -42,3 +42,8 @@ func (db *Database) Query(ctx context.Context, sql string, args ...any) (pgx.Row
 func (db *Database) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	return db.pool.QueryRow(ctx, sql, args...)
 }
+
+// BeginTx starts a new transaction. Caller should call Commit or Rollback on the returned tx.
+func (db *Database) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return db.pool.Begin(ctx)
+}

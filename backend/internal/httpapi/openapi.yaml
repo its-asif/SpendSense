@@ -129,7 +129,6 @@ paths:
           required: true
           schema:
             type: number
-            format: double
         - in: query
           name: from
           required: true
@@ -293,6 +292,21 @@ paths:
         '200':
           description: OK
 
+  /api/v1/wallets/transfer:
+    post:
+      summary: Transfer between wallets
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWalletTransferRequest'
+      responses:
+        '201':
+          description: Created
+
   /api/v1/incomes:
     post:
       summary: Create income
@@ -453,6 +467,32 @@ components:
           format: date
         notes:
           type: string
+    CreateWalletTransferRequest:
+      type: object
+      required: [from_wallet_id, to_wallet_id, amount, currency, transfer_date]
+      properties:
+        from_wallet_id:
+          type: string
+        to_wallet_id:
+          type: string
+        amount:
+          type: number
+          format: double
+          description: Source wallet amount with 2-digit precision.
+        exchange_rate:
+          type: number
+          format: double
+          description: Required when source and destination wallets use different currencies.
+        fee_amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        transfer_date:
+          type: string
+          format: date
+        notes:
+          type: string
     CurrencyOption:
       type: object
       properties:
@@ -468,7 +508,6 @@ components:
           type: integer
         rounding:
           type: number
-          format: double
         name_plural:
           type: string
         is_default:
@@ -491,13 +530,10 @@ components:
           type: string
         amount:
           type: number
-          format: double
         converted_amount:
           type: number
-          format: double
         exchange_rate:
           type: number
-          format: double
     DashboardBudgetRow:
       type: object
       properties:

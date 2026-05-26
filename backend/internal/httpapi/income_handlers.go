@@ -90,9 +90,9 @@ func (s *Server) handleCreateListIncomes(w http.ResponseWriter, r *http.Request)
 				limit = v
 			}
 		}
-		cursor := q.Get("cursor")
+		pagination := q.Get("pagination")
 
-		list, next, err := s.incomeService.ListIncomes(r.Context(), userID, limit, cursor)
+		list, next, err := s.incomeService.ListIncomes(r.Context(), userID, limit, pagination)
 		if err != nil {
 			writeError(w, err)
 			return
@@ -103,7 +103,7 @@ func (s *Server) handleCreateListIncomes(w http.ResponseWriter, r *http.Request)
 			resp = append(resp, toIncomeResponse(it))
 		}
 
-		writeJSON(w, http.StatusOK, map[string]any{"incomes": resp, "next_cursor": next})
+		writeJSON(w, http.StatusOK, map[string]any{"incomes": resp, "next_pagination": next})
 		return
 	default:
 		writeStatusError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"spendsense-backend/internal/domain"
@@ -14,6 +15,7 @@ type UserStore interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
+	UpdateUserPreferences(ctx context.Context, userID uuid.UUID, baseCurrency, timezone, locale string) (*domain.User, error)
 	StoreRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresInHours int) error
 	ValidateRefreshToken(ctx context.Context, userID uuid.UUID, token string) (bool, error)
 	DeleteRefreshToken(ctx context.Context, userID uuid.UUID, token string) error
@@ -32,6 +34,29 @@ func NewAuthService(db UserStore, jwtManager *JWTManager) *AuthService {
 
 func (as *AuthService) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
 	return as.db.GetUserByEmail(ctx, email)
+}
+
+func (as *AuthService) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, baseCurrency, timezone, locale string) (*domain.User, error) {
+	baseCurrency = strings.ToUpper(strings.TrimSpace(baseCurrency))
+	timezone = strings.TrimSpace(timezone)
+	locale = strings.TrimSpace(locale)
+
+	if baseCurrency == "" {
+		return nil, domain.NewDomainError(domain.ErrInvalidCurrency, "Base currency is required", 400)
+	}
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	if locale == "" {
+		locale = "en-US"
+	}
+
+	updated, err := as.db.UpdateUserPreferences(ctx, userID, baseCurrency, timezone, locale)
+	if err != nil {
+		return nil, domain.NewDomainError(domain.ErrInternal, "Failed to update user preferences", 500)
+	}
+
+	return updated, nil
 }
 
 type RegisterRequest struct {
