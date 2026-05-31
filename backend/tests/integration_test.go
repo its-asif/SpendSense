@@ -39,7 +39,7 @@ func TestAuthAndIncomeFlow(t *testing.T) {
 	registerResp, err := authSvc.Register(ctx, auth.RegisterRequest{
 		Email:    uniqueEmail,
 		Password: "StrongPass123!",
-	})
+	}, auth.SessionMetadata{})
 	if err != nil {
 		t.Fatalf("register failed: %v", err)
 	}

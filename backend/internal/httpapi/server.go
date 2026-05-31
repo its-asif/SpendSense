@@ -60,7 +60,7 @@ func NewServer(databaseURL, jwtSecret string) (*Server, error) {
 	server := &Server{
 		db:              db,
 		authService:     auth.NewAuthService(db, auth.NewJWTManager(jwtSecret)),
-		authMiddleware:  middleware.NewAuthMiddleware(auth.NewJWTManager(jwtSecret)),
+		authMiddleware:  middleware.NewAuthMiddleware(auth.NewJWTManager(jwtSecret), db),
 		mux:             http.NewServeMux(),
 		expenseService:  expense.NewService(expense.NewRepository(db), wallet.NewRepository(db), currencyService),
 		incomeService:   income.NewService(income.NewRepository(db), wallet.NewRepository(db), currencyService),

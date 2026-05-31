@@ -16,16 +16,22 @@ import (
 type contextKey string
 
 const (
-	userIDContextKey contextKey = "userID"
-	emailContextKey  contextKey = "email"
+	userIDContextKey    contextKey = "userID"
+	emailContextKey     contextKey = "email"
+	sessionIDContextKey contextKey = "sessionID"
 )
 
 type AuthMiddleware struct {
-	jwtManager *auth.JWTManager
+	jwtManager       *auth.JWTManager
+	sessionValidator SessionValidator
 }
 
-func NewAuthMiddleware(jwtManager *auth.JWTManager) *AuthMiddleware {
-	return &AuthMiddleware{jwtManager: jwtManager}
+type SessionValidator interface {
+	HasActiveSession(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID) (bool, error)
+}
+
+func NewAuthMiddleware(jwtManager *auth.JWTManager, sessionValidator SessionValidator) *AuthMiddleware {
+	return &AuthMiddleware{jwtManager: jwtManager, sessionValidator: sessionValidator}
 }
 
 func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
@@ -36,8 +42,24 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
+		if claims.SessionID == uuid.Nil || m.sessionValidator == nil {
+			writeAuthError(w, domain.NewDomainError(domain.ErrUnauthorized, "Session is no longer active", http.StatusUnauthorized))
+			return
+		}
+
+		active, err := m.sessionValidator.HasActiveSession(r.Context(), claims.UserID, claims.SessionID)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
+		if !active {
+			writeAuthError(w, domain.NewDomainError(domain.ErrUnauthorized, "Session is no longer active", http.StatusUnauthorized))
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), userIDContextKey, claims.UserID)
 		ctx = context.WithValue(ctx, emailContextKey, claims.Email)
+		ctx = context.WithValue(ctx, sessionIDContextKey, claims.SessionID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -50,6 +72,11 @@ func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 func EmailFromContext(ctx context.Context) (string, bool) {
 	email, ok := ctx.Value(emailContextKey).(string)
 	return email, ok
+}
+
+func SessionIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	sessionID, ok := ctx.Value(sessionIDContextKey).(uuid.UUID)
+	return sessionID, ok
 }
 
 func (m *AuthMiddleware) authenticate(r *http.Request) (*auth.Claims, error) {

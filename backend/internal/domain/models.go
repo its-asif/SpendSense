@@ -15,8 +15,12 @@ type User struct {
 	BaseCurrency string
 	Timezone     string
 	Locale       string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// TOTP (2FA)
+	TOTPSecret      *string
+	TOTPEnabled     bool
+	TOTPConfirmedAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type Expense struct {

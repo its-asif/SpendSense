@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    background-color: var(--color-dark-bg);
+    color: var(--color-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .surface-card {
+    @apply rounded-xl border border-dark-elevated bg-dark-card shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-cardHover hover:border-[#475569];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-accent-blue text-dark-bg hover:brightness-110;
+  }
+
+  .btn-secondary {
+    @apply border border-dark-elevated bg-dark-elevated text-text-primary hover:bg-[#475569];
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-dark-elevated bg-dark-bg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted transition-all duration-200 focus:border-accent-blue focus:outline-none focus:ring-2 focus:ring-accent-blue/20;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-md px-3 py-1 text-xs font-semibold;
+  }
+
+  .badge-income {
+    @apply bg-accent-green/10 text-accent-green;
+  }
+
+  .badge-expense {
+    @apply bg-accent-amber/10 text-accent-amber;
+  }
+
+  .badge-info {
+    @apply bg-accent-purple/10 text-accent-purple;
+  }
+}

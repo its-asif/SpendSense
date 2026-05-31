@@ -14,8 +14,9 @@ type JWTManager struct {
 }
 
 type Claims struct {
-	UserID uuid.UUID `json:"user_id"`
-	Email  string    `json:"email"`
+	UserID    uuid.UUID `json:"user_id"`
+	Email     string    `json:"email"`
+	SessionID uuid.UUID `json:"session_id"`
 	jwt.RegisteredClaims
 }
 
@@ -23,10 +24,11 @@ func NewJWTManager(secret string) *JWTManager {
 	return &JWTManager{jwtSecret: secret}
 }
 
-func (jm *JWTManager) GenerateAccessToken(userID uuid.UUID, email string) (string, error) {
+func (jm *JWTManager) GenerateAccessToken(userID uuid.UUID, email string, sessionID uuid.UUID) (string, error) {
 	claims := Claims{
-		UserID: userID,
-		Email:  email,
+		UserID:    userID,
+		Email:     email,
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

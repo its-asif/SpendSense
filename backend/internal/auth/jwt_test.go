@@ -10,8 +10,9 @@ func TestGenerateAndVerifyToken(t *testing.T) {
 	jm := NewJWTManager("test-secret")
 	uid := uuid.New()
 	email := "user@example.com"
+	sessionID := uuid.New()
 
-	tok, err := jm.GenerateAccessToken(uid, email)
+	tok, err := jm.GenerateAccessToken(uid, email, sessionID)
 	if err != nil {
 		t.Fatalf("failed to generate token: %v", err)
 	}
@@ -26,5 +27,8 @@ func TestGenerateAndVerifyToken(t *testing.T) {
 	}
 	if claims.Email != email {
 		t.Fatalf("expected email %s, got %s", email, claims.Email)
+	}
+	if claims.SessionID != sessionID {
+		t.Fatalf("expected session id %s, got %s", sessionID, claims.SessionID)
 	}
 }
