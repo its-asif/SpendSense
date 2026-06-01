@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/common/Button';
-import { Card } from '../components/common/Card';
 import { Input } from '../components/common/Input';
 import { clearSession, saveSession } from '../lib/storage';
 import { login, register } from '../api/auth';
@@ -22,33 +21,48 @@ export function Login({ onAuthenticated }: LoginProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center p-4">
-      <div className="grid w-full gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <Card className="p-6 md:p-8" title="SpendSense" subtitle="A quiet dashboard for personal finance">
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Sign in or create an account to connect to the backend API and view the dashboard.
-            </p>
-            <ul className="space-y-2 text-sm text-text-secondary">
-              <li>• Real API-backed auth</li>
-              <li>• Protected dashboard route</li>
-              <li>• Token refresh support</li>
-            </ul>
-          </div>
-        </Card>
+    <div className="auth-shell">
+      <div className="auth-orb auth-orb-left" aria-hidden="true" />
+      <div className="auth-orb auth-orb-right" aria-hidden="true" />
 
-        <Card className="p-6 md:p-8">
-          <div className="mb-5 flex gap-2">
-            <button className={`btn ${mode === 'sign-in' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('sign-in')} type="button">
+      <main className="auth-stage">
+        <section className="auth-card">
+          <div className="auth-card__header">
+            <div className="auth-brand-row">
+              <div>
+                <p className="auth-kicker">SpendSense</p>
+                <h1 className="auth-title">Your money, all in one place.</h1>
+              </div>
+            </div>
+            <p className="auth-copy">
+              Sign in or create an account to unlock your personalized dashboard, sync your wallets, and get insights into your spending habits.
+            </p>
+            
+          </div>
+
+          <div className="auth-toggle" role="tablist" aria-label="Authentication mode">
+            <button
+              className={mode === 'sign-in' ? 'auth-toggle__button is-active' : 'auth-toggle__button'}
+              onClick={() => setMode('sign-in')}
+              type="button"
+              role="tab"
+              aria-selected={mode === 'sign-in'}
+            >
               Sign in
             </button>
-            <button className={`btn ${mode === 'sign-up' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('sign-up')} type="button">
+            <button
+              className={mode === 'sign-up' ? 'auth-toggle__button is-active' : 'auth-toggle__button'}
+              onClick={() => setMode('sign-up')}
+              type="button"
+              role="tab"
+              aria-selected={mode === 'sign-up'}
+            >
               Sign up
             </button>
           </div>
 
           <form
-            className="space-y-4"
+            className="auth-form"
             onSubmit={async (event) => {
               event.preventDefault();
               setError(null);
@@ -56,29 +70,30 @@ export function Login({ onAuthenticated }: LoginProps) {
 
               try {
                 clearSession();
+
                 if (mode === 'sign-up') {
                   const session = await register({ email, password });
                   saveSession(session);
                   onAuthenticated(session);
                   navigate('/');
-                } else {
-                  // sign-in flow: attempt login; if server requests TOTP, prompt and retry
-                  try {
-                    const session = await login({ email, password, totp_code: totpRequired ? totpCode : undefined });
-                    saveSession(session);
-                    onAuthenticated(session);
-                    navigate('/');
-                  } catch (err: any) {
-                    const code = err?.response?.data?.error?.code;
-                    if (code === 'TOTP_REQUIRED') {
-                      setTotpRequired(true);
-                      setError('Two-factor authentication code required. Enter your code below and sign in again.');
-                    } else if (code === 'INVALID_CODE') {
-                      setError('Invalid two-factor authentication code.');
-                    } else {
-                      setError('Unable to sign in. Check your credentials and backend server.');
-                      throw err;
-                    }
+                  return;
+                }
+
+                try {
+                  const session = await login({ email, password, totp_code: totpRequired ? totpCode : undefined });
+                  saveSession(session);
+                  onAuthenticated(session);
+                  navigate('/');
+                } catch (err: any) {
+                  const code = err?.response?.data?.error?.code;
+                  if (code === 'TOTP_REQUIRED') {
+                    setTotpRequired(true);
+                    setError('Two-factor authentication code required. Enter your code below and sign in again.');
+                  } else if (code === 'INVALID_CODE') {
+                    setError('Invalid two-factor authentication code.');
+                  } else {
+                    setError('Unable to sign in. Check your credentials and backend server.');
+                    throw err;
                   }
                 }
               } finally {
@@ -86,18 +101,59 @@ export function Login({ onAuthenticated }: LoginProps) {
               }
             }}
           >
-            <Input label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
-            <Input label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required />
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+            />
+            <Input
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
+              required
+            />
             {totpRequired && (
-              <Input label="Authenticator code" type="text" value={totpCode} onChange={(event) => setTotpCode(event.target.value)} placeholder="123456" required />
+              <Input
+                label="Authenticator code"
+                type="text"
+                value={totpCode}
+                onChange={(event) => setTotpCode(event.target.value)}
+                placeholder="123456"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+              />
             )}
-            {error && <p className="text-sm text-accent-red">{error}</p>}
-            <Button type="submit" className="w-full">
+            {error && <p className="auth-error">{error}</p>}
+            <Button type="submit" className="w-full justify-center">
               {isSubmitting ? 'Working...' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
             </Button>
           </form>
-        </Card>
-      </div>
+
+          <p className="auth-footer">
+            {mode === 'sign-in' ? 'New here?' : 'Already have an account?'}{' '}
+            <button
+              className="auth-inline-link"
+              type="button"
+              onClick={() => {
+                setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
+                setTotpRequired(false);
+                setTotpCode('');
+                setError(null);
+              }}
+            >
+              {mode === 'sign-in' ? 'Create your account' : 'Go back to sign in'}
+            </button>
+          </p>
+        </section>
+      </main>
     </div>
   );
 }

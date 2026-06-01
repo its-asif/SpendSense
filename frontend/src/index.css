@@ -10,6 +10,10 @@
   }
 
   body {
+    background:
+      radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 32%),
+      radial-gradient(circle at right 20%, rgba(139, 92, 246, 0.14), transparent 26%),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 1));
     background-color: var(--color-dark-bg);
     color: var(--color-text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
@@ -69,5 +73,127 @@
 
   .badge-info {
     @apply bg-accent-purple/10 text-accent-purple;
+  }
+
+  .auth-shell {
+    @apply relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 sm:px-6 lg:px-8;
+  }
+
+  .auth-stage {
+    @apply relative z-10 w-full max-w-md;
+  }
+
+  .auth-card {
+    @apply relative overflow-hidden rounded-[28px] border border-white/[0.12] bg-white/[0.08] p-6 shadow-[0_30px_80px_-24px_rgba(15,23,42,0.75)] backdrop-blur-2xl sm:p-8;
+  }
+
+  .auth-card::before {
+    content: '';
+    @apply pointer-events-none absolute inset-0 rounded-[28px] border border-white/10;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 40%, rgba(255, 255, 255, 0.03));
+    mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+    -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+    padding: 1px;
+  }
+
+  .auth-card__header {
+    @apply relative space-y-4;
+  }
+
+  .auth-brand-row {
+    @apply flex items-center gap-4;
+  }
+
+  .auth-mark {
+    @apply flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/[0.15] bg-white/[0.12] text-lg font-bold text-white shadow-lg;
+  }
+
+  .auth-kicker {
+    @apply text-xs font-semibold uppercase tracking-[0.3em] text-sky-200/80;
+  }
+
+  .auth-title {
+    @apply mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl;
+  }
+
+  .auth-copy {
+    @apply max-w-sm text-sm leading-6 text-slate-200/85;
+  }
+
+  .auth-chips {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .auth-chips span {
+    @apply rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-xs font-medium text-slate-100/85 backdrop-blur;
+  }
+
+  .auth-toggle {
+    @apply mt-6 grid grid-cols-2 rounded-2xl border border-white/10 bg-black/10 p-1;
+  }
+
+  .auth-toggle__button {
+    @apply rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-300 transition-all duration-200;
+  }
+
+  .auth-toggle__button.is-active {
+    @apply bg-white text-slate-950 shadow-lg;
+  }
+
+  .auth-form {
+    @apply mt-6 space-y-4;
+  }
+
+  .auth-form .input {
+    @apply border-white/[0.12] bg-white/10 text-white placeholder:text-slate-300/60 focus:border-sky-300 focus:ring-sky-300/20;
+  }
+
+  .auth-form .input::placeholder {
+    color: rgba(226, 232, 240, 0.55);
+  }
+
+  .auth-form .input-label,
+  .auth-form label > span {
+    @apply text-slate-200/80;
+  }
+
+  .auth-error {
+    @apply rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100;
+  }
+
+  .auth-form .btn-primary {
+    @apply bg-gradient-to-r from-sky-400 to-cyan-300 text-slate-950 shadow-[0_18px_40px_-16px_rgba(125,211,252,0.8)] hover:brightness-105;
+  }
+
+  .auth-form .btn {
+    @apply rounded-2xl py-3.5;
+  }
+
+  .auth-footer {
+    @apply mt-5 text-center text-sm text-slate-300/80;
+  }
+
+  .auth-inline-link {
+    @apply font-semibold text-sky-200 underline-offset-4 transition hover:text-white hover:underline;
+  }
+
+  .auth-orb {
+    @apply pointer-events-none absolute rounded-full blur-3xl;
+  }
+
+  .auth-orb-left {
+    top: 8%;
+    left: 8%;
+    height: 18rem;
+    width: 18rem;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.3), transparent 68%);
+  }
+
+  .auth-orb-right {
+    right: 6%;
+    bottom: 6%;
+    height: 22rem;
+    width: 22rem;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.24), transparent 68%);
   }
 }
