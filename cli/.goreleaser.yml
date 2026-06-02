@@ -1,3 +1,5 @@
+version: 2
+
 project_name: spendsense-cli
 
 before:
@@ -26,9 +28,12 @@ archives:
     builds:
       - spendsense
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: checksums.txt
