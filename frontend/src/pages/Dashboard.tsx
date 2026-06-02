@@ -167,6 +167,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const [manageWalletsOpen, setManageWalletsOpen] = useState(false);
   const [manageExpensesOpen, setManageExpensesOpen] = useState(false);
   const [manageIncomesOpen, setManageIncomesOpen] = useState(false);
+  const [transactionHistoryOpen, setTransactionHistoryOpen] = useState(false);
+  const [transactionHistoryPage, setTransactionHistoryPage] = useState(1);
 
   const openCreateWallet = () => {
     setManageWalletsOpen(false);
@@ -929,7 +931,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     progress: Math.min(Math.max(budget.usage_percent, 0), 100),
     color: budget.category_color ?? ['#6366F1', '#10B981', '#F59E0B', '#A855F7'][index % 4],
   }));
-  const transactionHistoryRows = [
+  const allTransactionHistoryRows = [
     ...expenses.map((expense) => {
       const date = new Date(expense.date);
       const category = categoryMetaByID.get(expense.category_id);
@@ -974,8 +976,16 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     }),
   ]
     .sort((a, b) => b.sortDate - a.sortDate)
-    .slice(0, 6)
     .map(({ sortDate, ...transaction }) => transaction);
+
+  const transactionHistoryRows = allTransactionHistoryRows.slice(0, 5);
+  const transactionsPerPage = 10;
+  const totalTransactionPages = Math.max(1, Math.ceil(allTransactionHistoryRows.length / transactionsPerPage));
+  const currentTransactionPage = Math.min(transactionHistoryPage, totalTransactionPages);
+  const paginatedTransactionHistoryRows = allTransactionHistoryRows.slice(
+    (currentTransactionPage - 1) * transactionsPerPage,
+    currentTransactionPage * transactionsPerPage,
+  );
 
   const isLoadingDashboard = isLoadingSummary && !dashboardSummary;
   const displayError = error ?? metaError ?? summaryError ?? widgetsError;
@@ -1261,7 +1271,10 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
         <TransactionHistoryCard
           transactions={transactionHistoryRows}
-          onSeeMore={() => setManageExpensesOpen(true)}
+          onSeeMore={() => {
+            setTransactionHistoryPage(1);
+            setTransactionHistoryOpen(true);
+          }}
         />
       </section>
 
@@ -1478,6 +1491,93 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             onSubmit={handleCreateIncome}
             onCancel={() => setManageIncomesOpen(false)}
           />
+        </Modal>
+      )}
+
+      {transactionHistoryOpen && (
+        <Modal
+          title="All transactions"
+          onClose={() => {
+            setTransactionHistoryOpen(false);
+            setTransactionHistoryPage(1);
+          }}
+        >
+          {allTransactionHistoryRows.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-dark-elevated p-8 text-center text-sm text-text-muted">
+              No transactions found.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="max-h-[60vh] overflow-auto rounded-2xl border border-dark-elevated">
+                <table className="min-w-full divide-y divide-dark-elevated text-left">
+                  <thead className="bg-dark-bg/80">
+                    <tr className="text-xs uppercase tracking-[0.14em] text-text-muted">
+                      <th className="px-4 py-3 font-medium">Category</th>
+                      <th className="px-4 py-3 font-medium">Date</th>
+                      <th className="px-4 py-3 font-medium">Description</th>
+                      <th className="px-4 py-3 font-medium text-right">Amount</th>
+                      <th className="px-4 py-3 font-medium text-right">Currency</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dark-elevated">
+                    {paginatedTransactionHistoryRows.map((transaction) => {
+                      const amountClass = transaction.type === 'income' ? 'text-accent-green' : 'text-accent-amber';
+
+                      return (
+                        <tr key={transaction.id} className="bg-dark-bg/40 text-sm text-text-primary">
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
+                                style={{ backgroundColor: transaction.categoryColor }}
+                              >
+                                {transaction.category.slice(0, 1).toUpperCase()}
+                              </span>
+                              <div>
+                                <p className="font-semibold text-text-primary">{transaction.category}</p>
+                                {transaction.status ? <p className="text-xs text-text-muted">{transaction.status}</p> : null}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-text-muted">{transaction.dateLabel}</td>
+                          <td className="px-4 py-4 text-text-secondary">{transaction.description}</td>
+                          <td className={`px-4 py-4 text-right font-mono font-semibold ${amountClass}`}>
+                            {transaction.type === 'income' ? '+' : '-'}
+                            {formatCurrency(transaction.amount, transaction.currency, settings.locale)}
+                          </td>
+                          <td className="px-4 py-4 text-right text-text-muted">{transaction.currency}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-text-muted">
+                  Page {currentTransactionPage} of {totalTransactionPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setTransactionHistoryPage((page) => Math.max(1, page - 1))}
+                    disabled={currentTransactionPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setTransactionHistoryPage((page) => Math.min(totalTransactionPages, page + 1))}
+                    disabled={currentTransactionPage === totalTransactionPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </Modal>
       )}
 

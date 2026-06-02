@@ -1,4 +1,8 @@
 import { readSession } from './storage';
+import currencies from './currencies';
+
+// initialize currency symbol cache (loads from localStorage and refreshes in background)
+currencies.initCurrencies();
 
 export type UserSettings = {
   defaultCurrency: string;
@@ -78,11 +82,45 @@ export function subscribeToUserSettings(onChange: () => void) {
 export function formatCurrency(amount: number, currencyCode?: string, locale?: string) {
   const resolvedCurrency = currencyCode || readUserSettings().defaultCurrency;
   const resolvedLocale = locale || readUserSettings().locale;
+  const resolvedDigits = currencies.getDecimalDigitsSync(resolvedCurrency);
+  const roundedAmount = Number(amount.toFixed(resolvedDigits));
+
+  const formatWithOptionalFraction = (formatter: Intl.NumberFormat) => {
+    if (Number.isInteger(roundedAmount)) {
+      return formatter
+        .formatToParts(roundedAmount)
+        .filter((part) => part.type !== 'decimal' && part.type !== 'fraction')
+        .map((part) => part.value)
+        .join('');
+    }
+
+    return formatter.format(roundedAmount);
+  };
+
+  // prefer server-provided native symbol when available (fast sync lookup)
+  const symbolNative = currencies.getSymbolNativeSync(resolvedCurrency);
+  
+  if (symbolNative) {
+    const formatted = formatWithOptionalFraction(
+      new Intl.NumberFormat(resolvedLocale, {
+        minimumFractionDigits: resolvedDigits,
+        maximumFractionDigits: resolvedDigits,
+      }),
+    );
+    return `${symbolNative} ${formatted}`;
+  }
 
   try {
-    return new Intl.NumberFormat(resolvedLocale, { style: 'currency', currency: resolvedCurrency }).format(amount);
+    return formatWithOptionalFraction(
+      new Intl.NumberFormat(resolvedLocale, {
+        style: 'currency',
+        currency: resolvedCurrency,
+        minimumFractionDigits: resolvedDigits,
+        maximumFractionDigits: resolvedDigits,
+      }),
+    );
   } catch {
-    return `${amount.toFixed(2)} ${resolvedCurrency}`;
+    return `${roundedAmount.toFixed(resolvedDigits)} ${resolvedCurrency}`;
   }
 }
 

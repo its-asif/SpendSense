@@ -1,15 +1,19 @@
-# SpendSense - Phase 1
+# SpendSense
 
 Personal expense tracker. One user, no teams, no sharing.
 
-## Phase 1 Scope
+## Project Status
 
-- ✅ User Registration & Login (JWT + Redis refresh tokens)
-- ✅ Create & List Expenses (cursor pagination)
-- ✅ Edit & Soft-Delete Expenses
-- ✅ Basic Categories (10 system defaults)
-- ✅ CLI for quick logging
-- ✅ Web Dashboard
+- **Backend API:** Implemented (Go 1.21, Gin) — API server under `backend/cmd/api`.
+- **Auth:** JWT access tokens + Redis-backed refresh tokens implemented.
+- **Expenses:** Create, list (cursor pagination), edit, and soft-delete implemented.
+- **Categories:** 10 system default categories seeded via migrations.
+- **CLI:** Basic commands for register, login, add, list, and logout implemented (`cli/`).
+- **Frontend:** Web dashboard and basic views implemented under `frontend/`.
+- **Migrations:** SQL migrations live in `backend/migrations`.
+- **Infrastructure:** Docker Compose configs available for Postgres + Redis (`infrastructure/docker-compose.yml`).
+- **API Docs:** Swagger UI available at `/api/docs` when the backend is running.
+- **Tests:** Integration tests exist; overall coverage target (80%+) still in progress.
 
 ## Tech Stack
 
@@ -151,7 +155,7 @@ Config stored at `~/.expenserc`
 make test
 ```
 
-Aim for 80%+ coverage in Phase 1.
+Aim for 80%+ coverage.
 
 ### Database
 
@@ -161,7 +165,7 @@ Migrations managed with golang-migrate. New migrations:
 migrate create -ext sql -dir backend/migrations -seq <name>
 ```
 
-## Database Schema (Phase 1)
+## Database Schema
 
 ### users
 - id (BIGSERIAL PK)
@@ -238,15 +242,7 @@ JWT_SECRET=your-secret-key
 ALLOW_FUTURE_DATES=false
 ```
 
-## Definition of Done (Phase 1)
+## Roadmap
 
-- [ ] All FR-P1-01 through FR-P1-06 implemented
-- [ ] 80%+ test coverage
-- [ ] Docker Compose runs Postgres 15 + Redis
-- [ ] Swagger docs at /api/docs
-- [ ] Cursor pagination verified
-- [ ] Decimal amount handling implemented (amount)
-- [ ] Income tracking implemented
-- [ ] Wallet + transfer + transfer-fee flow implemented
-- [ ] Handlers + Service + Repo layers for all FRs
-- [ ] README with setup + API examples
+- Keep improving test coverage and expand integration tests.
+- Implement remaining features from project planning as time permits.

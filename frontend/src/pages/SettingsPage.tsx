@@ -15,6 +15,7 @@ import { logoutAll, logoutOtherSessions, updateUserPreferences, updateUserProfil
 import { readSession, saveSession } from '../lib/storage';
 import { readUserSettings, saveUserSettings, type UserSettings } from '../lib/userSettings';
 import { formatCurrency } from '../lib/userSettings';
+import { timezoneOptions } from '../lib/timezones';
 import type { ApiSessionRow, AuthUser, CurrencyOption, DashboardSummary, DashboardWidgetsResponse, Wallet } from '../types';
 
 type SettingsTabId = 'account' | 'general' | 'profile' | 'security' | 'session';
@@ -82,6 +83,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [twoFASetupData, setTwoFASetup] = useState<{ secret: string; otp_auth_url: string; qr_data_url: string } | null>(null);
   const [twoFACode, setTwoFACode] = useState('');
+  const timezoneExists = timezoneOptions.some((option) => option.zone === settings.timezone);
 
   useEffect(() => {
     const nextTab = tabIdFromSlug(tabSlug);
@@ -439,17 +441,28 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
 
                   <Input
                     label="Locale"
-                    value={settings.locale}
-                    onChange={(event) => setSettings((current) => ({ ...current, locale: event.target.value }))}
+                    value={settings.locale || 'en-US'}
+                    disabled
                     placeholder="en-US"
                   />
 
-                  <Input
-                    label="Timezone"
-                    value={settings.timezone}
-                    onChange={(event) => setSettings((current) => ({ ...current, timezone: event.target.value }))}
-                    placeholder="Asia/Dhaka"
-                  />
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-text-secondary">Timezone</span>
+                    <select
+                      className="input"
+                      value={settings.timezone}
+                      onChange={(event) => setSettings((current) => ({ ...current, timezone: event.target.value }))}
+                    >
+                      {!timezoneExists && settings.timezone && (
+                        <option value={settings.timezone}>{settings.timezone}</option>
+                      )}
+                      {timezoneOptions.map((option) => (
+                        <option key={option.zone} value={option.zone}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
                   <div className="flex items-center gap-3">
                     <Button type="submit">Save settings</Button>

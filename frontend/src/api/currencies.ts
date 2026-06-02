@@ -1,10 +1,13 @@
 import client from './client';
 import type { CurrencyConvertResponse, CurrencyListResponse, CurrencyOption } from '../types';
+import currencies from '../lib/currencies';
 
 export async function listCurrencies(defaultCurrency?: string): Promise<CurrencyOption[]> {
   const response = await client.get<CurrencyListResponse>('/api/v1/currencies', {
     params: defaultCurrency ? { default_currency: defaultCurrency } : undefined,
   });
+
+  currencies.seedCurrencyCache(response.data.currencies);
 
   return response.data.currencies;
 }
