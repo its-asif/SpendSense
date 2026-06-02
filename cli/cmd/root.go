@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/subosito/gotenv"
 )
 
 var (
@@ -21,19 +22,21 @@ func Execute() error {
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "expense",
+		Use:           "spendsense",
 		Short:         "SpendSense CLI",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return initConfig()
+			if err := initConfig(); err != nil {
+				return err
+			}
+			return applyFlagOverrides(cmd)
 		},
 	}
 
 	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.expenserc)")
-	cmd.PersistentFlags().String("api-url", "http://localhost:8080", "API server URL")
+	cmd.PersistentFlags().String("api-url", "", "API server URL (overrides config and env)")
 
-	_ = viper.BindPFlag("api_url", cmd.PersistentFlags().Lookup("api-url"))
 	viper.SetDefault("api_url", "http://localhost:8080")
 	viper.SetDefault("base_currency", "USD")
 	viper.SetDefault("timezone", "UTC")
@@ -50,6 +53,10 @@ func newRootCmd() *cobra.Command {
 }
 
 func initConfig() error {
+	if err := loadEnvFiles(); err != nil {
+		return err
+	}
+
 	viper.SetEnvPrefix("SPENDSENSE")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv()
@@ -70,6 +77,52 @@ func initConfig() error {
 		var notFound viper.ConfigFileNotFoundError
 		if !errors.As(err, &notFound) {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func loadEnvFiles() error {
+	paths := []string{".env"}
+	if exePath, err := os.Executable(); err == nil {
+		paths = append(paths, filepath.Join(filepath.Dir(exePath), ".env"))
+	}
+
+	seen := make(map[string]struct{}, len(paths))
+	for _, path := range paths {
+		absolutePath, err := filepath.Abs(path)
+		if err == nil {
+			path = absolutePath
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+
+		if _, err := os.Stat(path); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+
+		if err := gotenv.Load(path); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func applyFlagOverrides(cmd *cobra.Command) error {
+	if cmd.Flags().Changed("api-url") {
+		apiURL, err := cmd.Flags().GetString("api-url")
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(apiURL) != "" {
+			viper.Set("api_url", apiURL)
 		}
 	}
 

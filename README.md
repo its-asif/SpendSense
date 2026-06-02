@@ -80,23 +80,29 @@ For a full API reference with example request and response bodies see the backen
 
 ```bash
 # Register
-./bin/expense register --email user@example.com
+./bin/spendsense auth register
 
 # Login
-./bin/expense login --email user@example.com
+./bin/spendsense auth login
 
 # Add expense
-./bin/expense add --amount 50 --category Food --date today --merchant "Cafe"
+./bin/spendsense expense add --amount 50 --category Food --date today --merchant "Cafe"
 
 # List expenses
-./bin/expense list
-./bin/expense list --from 2024-01-01 --to 2024-01-31
+./bin/spendsense expense list
+./bin/spendsense expense list --from 2024-01-01 --to 2024-01-31
 
 # Logout
-./bin/expense logout
+./bin/spendsense auth logout
 ```
 
+Build locally with `make cli-build`. This creates `bin/spendsense`.
+
+For GitHub releases, see [cli/README.md](cli/README.md).
+
 Config stored at `~/.expenserc`
+
+To change the API root for the CLI, edit [cli/.env](cli/.env) and set `SPENDSENSE_API_URL` to your backend URL. You can still override it per command with `--api-url`.
 
 ## Project Structure
 
