@@ -108,53 +108,6 @@ spendsense --help
 
 ---
 
-## Verify File Integrity (Optional)
-
-You can verify the downloaded file using SHA256 checksums.
-
-### Linux/macOS
-
-```bash
-sha256sum spendsense-cli_0.1.1_linux_amd64.tar.gz
-```
-
-Expected output:
-
-```text
-62e9c333d8c80ab6b69fc0c0b003d3c03088a92172aefee694ca8e39da61d82e
-```
-
-### macOS Intel
-
-```text
-72d030bcf228af655b7b92649356444a8eaeaf32043751b0ab079d34ae557353
-```
-
-### macOS Apple Silicon
-
-```text
-405321964375d1d9c62ce561dba89e167a217dff3dc844098bf43212a8075131
-```
-
-### Linux x86_64
-
-```text
-62e9c333d8c80ab6b69fc0c0b003d3c03088a92172aefee694ca8e39da61d82e
-```
-
-### Linux ARM64
-
-```text
-4d0db4dfea28f83c1c2b6a1dbec4df29458ee13ae087a6e6412fc03a4ef384d1
-```
-
-### Windows x86_64
-
-```text
-0620d960ef8d44e279b6e635ca100e1407f1677d918d4c220d71a41fccd4beb4
-```
-
----
 
 ## Getting Started
 
