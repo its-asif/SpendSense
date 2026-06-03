@@ -1,254 +1,229 @@
 # SpendSense
 
-Personal expense tracker. One user, no teams, no sharing.
+Personal expense tracker for a single user — no teams, sharing, or multi-tenant features.
 
-## Project Status
+This document describes what is **implemented and runnable today**, not a future roadmap.
 
-- **Backend API:** Implemented (Go 1.21, Gin) — API server under `backend/cmd/api`.
-- **Auth:** JWT access tokens + Redis-backed refresh tokens implemented.
-- **Expenses:** Create, list (cursor pagination), edit, and soft-delete implemented.
-- **Categories:** 10 system default categories seeded via migrations.
-- **CLI:** Basic commands for register, login, add, list, and logout implemented (`cli/`).
-- **Frontend:** Web dashboard and basic views implemented under `frontend/`.
-- **Migrations:** SQL migrations live in `backend/migrations`.
-- **Infrastructure:** Docker Compose configs available for Postgres + Redis (`infrastructure/docker-compose.yml`).
-- **API Docs:** Swagger UI available at `/api/docs` when the backend is running.
-- **Tests:** Integration tests exist; overall coverage target (80%+) still in progress.
+## What is built
 
-## Tech Stack
+### Backend (`backend/`)
 
-| Layer | Choice |
-|-------|--------|
-| Backend | Go 1.21, Gin, PostgreSQL 15, SQLC, Redis |
-| Auth | JWT (15 min) + Redis refresh token (7 days) |
-| Frontend | React 18, TypeScript, Tailwind, Shadcn/ui, Recharts, TanStack Query |
-| CLI | Go + Cobra + Viper |
-| Migrations | golang-migrate |
+- HTTP API on **Go 1.26** using the standard library (`net/http`, `ServeMux`) — handlers live in `internal/httpapi/`.
+- **PostgreSQL 16** persistence (pgx), with SQL migrations in `backend/migrations/` (seven versions: core schema through 2FA).
+- **Redis** (optional): refresh-token storage and currency caching; the API starts without Redis but auth refresh behavior is degraded.
+- **Auth:** register, login, refresh, logout (single session / all sessions / other sessions), profile and preferences, password change, session list and revoke, TOTP 2FA setup/confirm/disable.
+- **Resources (REST, `/api/v1/…`):** expenses, incomes, categories, wallets (including transfers), dashboard summary and widgets, currency list and conversion.
+- **Ops:** health check, OpenAPI spec, Swagger UI at `/api/docs`, refresh-token cleanup endpoint.
+- **Middleware:** CORS, rate limiting, request logging, panic recovery, JWT auth on protected routes.
+- **Tests:** unit tests for auth, currency, expense, and wallet packages; integration tests in `backend/tests/` (require `DATABASE_URL`).
 
-## Quick Start
+### Frontend (`frontend/`)
+
+- **React 18**, **TypeScript**, **Vite**, **Tailwind CSS**, **axios**, **Recharts**.
+- Authenticated app with routes: dashboard, expenses, incomes, wallets, categories, reports (client-side aggregates), and settings (account, general, profile, security, sessions).
+- Token refresh via axios interceptors; theme toggle; dashboard KPIs, charts, and budget usage widgets (when budget rows exist in the database).
+
+### CLI (`cli/`)
+
+- **Cobra + Viper** binary `spendsense`: `auth`, `expense`, `category`, `wallet`, `income`, and `config` command groups.
+- Config file: `~/.expenserc`; optional `SPENDSENSE_API_URL` / `--api-url`.
+- GitHub Actions workflow publishes release binaries (see [cli/README.md](cli/README.md)).
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| API | Go 1.26, `net/http`, domain packages under `internal/` |
+| Database | PostgreSQL 16 (Docker image in `backend/docker-compose.yml`) |
+| Cache / sessions | Redis 7 (optional) |
+| Auth | JWT access tokens (~15 min), refresh tokens (~7 days, stored hashed in Postgres) |
+| API contract | OpenAPI YAML + `oapi-codegen` types (`make openapi`) |
+| Web UI | React 18, TypeScript, Vite 5, Tailwind 3, Recharts |
+| CLI | Go, Cobra, Viper |
+| Migrations | [golang-migrate](https://github.com/golang-migrate/migrate) SQL files |
+
+## Quick start
 
 ### Prerequisites
-- Go 1.21+
+
+- Go 1.26+
 - Node.js 18+
-- Docker & Docker Compose
-- PostgreSQL 15 (or via Docker)
-- Redis (or via Docker)
+- Docker and Docker Compose
+- [golang-migrate](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate) CLI (for applying SQL migrations)
 
-### Setup
-
-1. **Start infrastructure**
-   ```bash
-   make infra-up
-   ```
-
-2. **Install dependencies**
-   ```bash
-   # Backend
-   cd backend && go mod download
-   
-   # Frontend
-   cd ../frontend && npm install
-   ```
-
-3. **Run migrations**
-   ```bash
-   make migrate
-   ```
-
-4. **Start backend**
-   ```bash
-   make backend-run
-   ```
-
-5. **Start frontend** (in new terminal)
-   ```bash
-   make frontend-dev
-   ```
-
-6. **Build CLI**
-   ```bash
-   make cli-build
-   ```
-
-## API Documentation
-
-Swagger docs available at `http://localhost:8080/api/docs` once backend is running.
-
-For a full API reference with example request and response bodies see the backend-specific API reference: [backend/README.md](backend/README.md).
-
-## CLI Usage
+### 1. Start Postgres and Redis
 
 ```bash
-# Register
+cd backend
+docker compose up -d
+```
+
+Postgres: `localhost:5432` (user/password/db: `spendsense`). Adminer: `http://localhost:8081`.
+
+### 2. Configure and migrate the database
+
+Create `backend/.env`:
+
+```env
+PORT=8080
+DATABASE_URL=postgres://spendsense:spendsense@localhost:5432/spendsense?sslmode=disable
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=change-me-in-production
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+```
+
+Apply migrations:
+
+```bash
+migrate -path backend/migrations -database "$DATABASE_URL" up
+```
+
+### 3. Run the API
+
+```bash
+cd backend
+go run ./cmd/api
+```
+
+- API: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/api/docs`
+- OpenAPI spec: `http://localhost:8080/openapi.yaml`
+
+### 4. Run the web app
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Optional: `frontend/.env` with `VITE_API_URL=http://localhost:8080` (defaults to that URL).
+
+### 5. Build the CLI (optional)
+
+From the repository root:
+
+```bash
+make cli-build
+./bin/spendsense --help
+```
+
+## Makefile targets
+
+The root [Makefile](Makefile) currently provides:
+
+| Target | Purpose |
+|--------|---------|
+| `make test` | Run `go test ./...` in `backend/` |
+| `make openapi` | Regenerate Go types from `backend/internal/httpapi/openapi.yaml` |
+| `make cli-build` | Build `bin/spendsense` from `cli/` |
+| `make cli-run` | Build CLI and print help |
+
+## API documentation
+
+- Interactive docs: `http://localhost:8080/api/docs` (with the API running).
+- Endpoint reference with example bodies: [backend/README.md](backend/README.md).
+- Source of truth for request/response shapes: [backend/internal/httpapi/openapi.yaml](backend/internal/httpapi/openapi.yaml).
+
+## CLI usage
+
+```bash
+# Authentication
 ./bin/spendsense auth register
-
-# Login
 ./bin/spendsense auth login
+./bin/spendsense auth me
+./bin/spendsense auth refresh
+./bin/spendsense auth logout
+./bin/spendsense auth logout-all
 
-# Add expense
+# Expenses
 ./bin/spendsense expense add --amount 50 --category Food --date today --merchant "Cafe"
-
-# List expenses
 ./bin/spendsense expense list
 ./bin/spendsense expense list --from 2024-01-01 --to 2024-01-31
 
-# Logout
-./bin/spendsense auth logout
+# Other resources
+./bin/spendsense category list
+./bin/spendsense wallet list
+./bin/spendsense income list
+
+# Config (~/.expenserc)
+./bin/spendsense config view
 ```
 
-Build locally with `make cli-build`. This creates `bin/spendsense`.
+Override the API base URL with `SPENDSENSE_API_URL`, `cli/.env`, or `--api-url`.
 
-For GitHub releases, see [cli/README.md](cli/README.md).
-
-Config stored at `~/.expenserc`
-
-To change the API root for the CLI, edit [cli/.env](cli/.env) and set `SPENDSENSE_API_URL` to your backend URL. You can still override it per command with `--api-url`.
-
-## Project Structure
+## Project structure
 
 ```
 .
-├── backend/              # Go API
-│   ├── cmd/
-│   │   ├── api/         # API server
-│   │   └── migrate/     # Migration runner
+├── backend/
+│   ├── cmd/api/              # API entrypoint
 │   ├── internal/
-│   │   ├── handler/     # HTTP handlers
-│   │   ├── service/     # Business logic
-│   │   ├── repository/  # Data access
-│   │   ├── model/       # Domain models
-│   │   ├── middleware/  # HTTP middleware
-│   │   ├── config/      # Configuration
-│   │   ├── db/          # Database setup
-│   │   └── util/        # Utilities
-│   ├── migrations/      # SQL migrations
-│   ├── test/            # Integration tests
-│   └── go.mod
-├── cli/                 # Go CLI
-│   ├── cmd/             # Cobra commands
-│   ├── internal/        # CLI logic
-│   └── main.go
-├── frontend/            # React app
-│   ├── src/
-│   │   ├── components/  # React components
-│   │   ├── pages/       # Page components
-│   │   ├── hooks/       # Custom hooks
-│   │   ├── services/    # API services
-│   │   ├── stores/      # Zustand stores
-│   │   ├── types/       # TypeScript types
-│   │   └── lib/         # Utilities
-│   ├── vite.config.ts
-│   └── package.json
-├── infrastructure/      # Docker Compose
-│   └── docker-compose.yml
-├── docs/               # Documentation
-├── Makefile            # Development commands
+│   │   ├── httpapi/          # Routes, handlers, OpenAPI
+│   │   ├── auth/             # JWT, passwords, sessions, 2FA
+│   │   ├── expense/ income/ wallet/ category/ report/ currency/
+│   │   ├── middleware/ infra/ domain/
+│   │   └── …                 # budget, tag, receipt, etc. (no HTTP routes yet)
+│   ├── migrations/           # Sequential SQL up/down files
+│   ├── tests/                # Integration tests
+│   └── docker-compose.yml    # Postgres, Redis, Adminer
+├── frontend/
+│   └── src/
+│       ├── api/              # axios API clients
+│       ├── pages/            # Route-level views
+│       ├── components/       # UI building blocks
+│       └── hooks/ lib/ types/
+├── cli/
+│   └── cmd/                  # Cobra commands
+├── Makefile
 └── README.md
 ```
 
 ## Development
 
-### Code Organization
+### Backend layout
 
-- **Handlers** - HTTP request/response handling
-- **Services** - Business logic layer
-- **Repositories** - Data access layer
-- **Models** - Domain entities
+Each domain typically has `entity.go`, `repository.go`, and `service.go`. HTTP adapters are in `internal/httpapi/*_handlers.go`.
 
-### Testing
+### Tests
 
 ```bash
 make test
 ```
 
-Aim for 80%+ coverage.
+Integration tests need a reachable database:
 
-### Database
+```bash
+export DATABASE_URL='postgres://spendsense:spendsense@localhost:5432/spendsense?sslmode=disable'
+cd backend && go test ./tests/...
+```
 
-Migrations managed with golang-migrate. New migrations:
+### New migrations
 
 ```bash
 migrate create -ext sql -dir backend/migrations -seq <name>
 ```
 
-## Database Schema
+### Regenerate OpenAPI types
 
-### users
-- id (BIGSERIAL PK)
-- email (VARCHAR UNIQUE)
-- password_hash (VARCHAR)
-- created_at, updated_at (TIMESTAMP)
-
-### categories
-- id (BIGSERIAL PK)
-- name (VARCHAR)
-- is_system (BOOLEAN)
-- created_at (TIMESTAMP)
-
-### expenses
-- id (BIGSERIAL PK)
-- user_id (BIGINT FK → users)
-- wallet_id (BIGINT FK → wallets)
-- amount (DECIMAL, > 0)
-- currency (VARCHAR 3, ISO 4217)
-- category_id (BIGINT FK → categories)
-- date (DATE)
-- merchant (VARCHAR, nullable)
-- notes (TEXT, nullable)
-- is_deleted (BOOLEAN)
-- deleted_at (TIMESTAMP, nullable)
-- created_at, updated_at (TIMESTAMP)
-
-### incomes
-- id (BIGSERIAL PK)
-- user_id (BIGINT FK → users)
-- wallet_id (BIGINT FK → wallets)
-- category_id (BIGINT FK → categories, nullable)
-- source_name (VARCHAR)
-- amount (DECIMAL, > 0)
-- currency (VARCHAR 3, ISO 4217)
-- income_date (DATE)
-- notes (TEXT, nullable)
-- is_deleted (BOOLEAN)
-- deleted_at (TIMESTAMP, nullable)
-- created_at, updated_at (TIMESTAMP)
-
-### wallets
-- id (BIGSERIAL PK)
-- user_id (BIGINT FK → users)
-- name (VARCHAR)
-- wallet_type (CASH, MOBILE_WALLET, BANK, CARD)
-- provider (VARCHAR, nullable)
-- opening_balance (DECIMAL)
-- current_balance (DECIMAL)
-- currency (VARCHAR 3)
-- is_active (BOOLEAN)
-- created_at, updated_at (TIMESTAMP)
-
-### wallet_transfers
-- id (BIGSERIAL PK)
-- user_id (BIGINT FK → users)
-- from_wallet_id (BIGINT FK → wallets)
-- to_wallet_id (BIGINT FK → wallets)
-- amount (DECIMAL, > 0)
-- fee_amount (DECIMAL, >= 0)
-- transfer_date (DATE)
-- notes (TEXT, nullable)
-- created_at (TIMESTAMP)
-
-Indexes on user_id, category_id, date, (user_id, date DESC)
-
-## Environment Variables
-
-```
-PORT=8080
-DATABASE_URL=postgres://spendsense:spendsense@localhost:5432/spendsense
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your-secret-key
-ALLOW_FUTURE_DATES=false
+```bash
+make openapi
 ```
 
-## Roadmap
+## Environment variables (API)
 
-- Keep improving test coverage and expand integration tests.
-- Implement remaining features from project planning as time permits.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | Postgres connection string |
+| `JWT_SECRET` | Yes | Signing key for access tokens |
+| `PORT` | No | Listen port (default `8080`) |
+| `REDIS_URL` | No | Redis for refresh tokens / currency cache |
+| `CORS_ALLOWED_ORIGINS` | No | Comma-separated origins (default `http://localhost:5173`) |
+
+## Database notes
+
+- Primary keys are **UUIDs** (see `backend/migrations/001_init_schema.up.sql`).
+- Migration `002` seeds **10** global default categories (Food, Transport, Housing, etc.).
+- Migrations `003`–`007` add tables and columns for budgets, tags, receipts, notifications, personal loans, session metadata, and 2FA. Some of these tables are **not yet exposed** by HTTP handlers; dashboard budget widgets read from the `budgets` table when rows exist, but there is no budget CRUD API in the current codebase.
+
+For table-level detail, read the migration files under `backend/migrations/`.

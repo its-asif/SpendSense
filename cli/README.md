@@ -114,19 +114,19 @@ spendsense --help
 Register a new account:
 
 ```bash
-spendsense register --email user@example.com
+spendsense auth register
 ```
 
 Login:
 
 ```bash
-spendsense login --email user@example.com
+spendsense auth login
 ```
 
 Add an expense:
 
 ```bash
-spendsense add \
+spendsense expense add \
   --amount 50 \
   --category Food \
   --date today \
@@ -136,13 +136,13 @@ spendsense add \
 List expenses:
 
 ```bash
-spendsense list
+spendsense expense list
 ```
 
 Logout:
 
 ```bash
-spendsense logout
+spendsense auth logout
 ```
 
 ---
