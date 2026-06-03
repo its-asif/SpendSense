@@ -73,6 +73,32 @@ export type ExpenseCategory = {
   created_at: string;
 };
 
+export type Budget = {
+  id: string;
+  category_id: string;
+  category_name: string;
+  category_icon?: string | null;
+  category_color?: string | null;
+  amount: number;
+  currency: string;
+  period: string;
+  start_date: string;
+  rollover_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateBudgetRequest = {
+  category_id: string;
+  amount: number;
+  currency: string;
+  period?: string;
+  start_date?: string;
+  rollover_enabled?: boolean;
+};
+
+export type UpdateBudgetRequest = CreateBudgetRequest;
+
 export type Wallet = {
   id: string;
   name: string;

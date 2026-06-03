@@ -12,7 +12,7 @@ This document describes what is **implemented and runnable today**, not a future
 - **PostgreSQL 16** persistence (pgx), with SQL migrations in `backend/migrations/` (seven versions: core schema through 2FA).
 - **Redis** (optional): refresh-token storage and currency caching; the API starts without Redis but auth refresh behavior is degraded.
 - **Auth:** register, login, refresh, logout (single session / all sessions / other sessions), profile and preferences, password change, session list and revoke, TOTP 2FA setup/confirm/disable.
-- **Resources (REST, `/api/v1/…`):** expenses, incomes, categories, wallets (including transfers), dashboard summary and widgets, currency list and conversion.
+- **Resources (REST, `/api/v1/…`):** expenses, incomes, categories, budgets, wallets (including transfers), dashboard summary and widgets, currency list and conversion.
 - **Ops:** health check, OpenAPI spec, Swagger UI at `/api/docs`, refresh-token cleanup endpoint.
 - **Middleware:** CORS, rate limiting, request logging, panic recovery, JWT auth on protected routes.
 - **Tests:** unit tests for auth, currency, expense, and wallet packages; integration tests in `backend/tests/` (require `DATABASE_URL`).
@@ -20,7 +20,7 @@ This document describes what is **implemented and runnable today**, not a future
 ### Frontend (`frontend/`)
 
 - **React 18**, **TypeScript**, **Vite**, **Tailwind CSS**, **axios**, **Recharts**.
-- Authenticated app with routes: dashboard, expenses, incomes, wallets, categories, reports (client-side aggregates), and settings (account, general, profile, security, sessions).
+- Authenticated app with routes: dashboard, expenses, incomes, wallets, categories, budgets, reports (client-side aggregates), and settings (account, general, profile, security, sessions).
 - Token refresh via axios interceptors; theme toggle; dashboard KPIs, charts, and budget usage widgets (when budget rows exist in the database).
 
 ### CLI (`cli/`)
@@ -224,6 +224,6 @@ make openapi
 
 - Primary keys are **UUIDs** (see `backend/migrations/001_init_schema.up.sql`).
 - Migration `002` seeds **10** global default categories (Food, Transport, Housing, etc.).
-- Migrations `003`–`007` add tables and columns for budgets, tags, receipts, notifications, personal loans, session metadata, and 2FA. Some of these tables are **not yet exposed** by HTTP handlers; dashboard budget widgets read from the `budgets` table when rows exist, but there is no budget CRUD API in the current codebase.
+- Migrations `003`–`007` add tables and columns for tags, receipts, notifications, personal loans, session metadata, and 2FA. Budgets have full CRUD at `/api/v1/budgets`; tags, receipts, loans, and notifications remain schema-only for now.
 
 For table-level detail, read the migration files under `backend/migrations/`.

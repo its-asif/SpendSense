@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: SpendSense API
   version: "1.0.0"
-  description: API for SpendSense Phase 1 (expenses, incomes, wallets, categories, auth)
+  description: API for SpendSense (expenses, incomes, wallets, categories, budgets, auth)
 servers:
   - url: http://localhost:8080
 paths:
@@ -269,6 +269,105 @@ paths:
         '200':
           description: OK
 
+  /api/v1/budgets:
+    post:
+      summary: Create budget
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+        '409':
+          description: Monthly budget already exists for category
+
+    get:
+      summary: List budgets
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [MONTHLY, WEEKLY, YEARLY]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetListResponse'
+
+  /api/v1/budgets/{id}:
+    get:
+      summary: Get budget
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+
+    put:
+      summary: Update budget
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+
+    delete:
+      summary: Delete budget
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Deleted
+
   /api/v1/wallets:
     post:
       summary: Create wallet
@@ -428,6 +527,70 @@ components:
           type: string
         is_system:
           type: boolean
+    BudgetRequest:
+      type: object
+      required: [category_id, amount, currency]
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        period:
+          type: string
+          enum: [MONTHLY, WEEKLY, YEARLY]
+          default: MONTHLY
+        start_date:
+          type: string
+          format: date
+        rollover_enabled:
+          type: boolean
+          default: false
+    Budget:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        category_id:
+          type: string
+          format: uuid
+        category_name:
+          type: string
+        category_icon:
+          type: string
+          nullable: true
+        category_color:
+          type: string
+          nullable: true
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        period:
+          type: string
+        start_date:
+          type: string
+          format: date
+        rollover_enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BudgetListResponse:
+      type: object
+      properties:
+        budgets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Budget'
     CreateWalletRequest:
       type: object
       required: [name, wallet_type, opening_balance, currency]

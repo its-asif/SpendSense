@@ -184,6 +184,28 @@ Create body example:
 
 `wallet_type`: `CASH`, `MOBILE_WALLET`, `BANK`, `CARD`.
 
+### Budgets
+
+| Method | Path |
+|--------|------|
+| POST, GET | `/api/v1/budgets` |
+| GET, PUT, DELETE | `/api/v1/budgets/{id}` |
+
+List query: `period` (`MONTHLY`, `WEEKLY`, `YEARLY`). Only one **monthly** budget per category is allowed per user (409 on duplicate).
+
+Create body example:
+
+```json
+{
+  "category_id": "…",
+  "amount": 500,
+  "currency": "USD",
+  "period": "MONTHLY",
+  "start_date": "2026-06-01",
+  "rollover_enabled": false
+}
+```
+
 ### Dashboard
 
 | Method | Path |
@@ -191,7 +213,7 @@ Create body example:
 | GET | `/api/v1/dashboard/summary` |
 | GET | `/api/v1/dashboard/widgets` |
 
-Widgets include budget usage rows when matching data exists in the `budgets` table.
+Widgets include monthly budget usage from the `budgets` table.
 
 ### Currencies
 
@@ -233,4 +255,4 @@ go test ./tests/...
 
 ## Packages without HTTP routes
 
-The following exist in `internal/` or in migrations but are **not** part of the public API yet: budget management (CRUD), tags, receipts, notifications, personal loans, recurring job processing. Do not assume endpoints for these until they appear in `openapi.yaml` and the handler registrations in `internal/httpapi/`.
+The following exist in `internal/` or in migrations but are **not** part of the public API yet: tags, receipts, notifications, personal loans, recurring job processing. Do not assume endpoints for these until they appear in `openapi.yaml` and the handler registrations in `internal/httpapi/`.

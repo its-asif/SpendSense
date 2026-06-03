@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"spendsense-backend/internal/auth"
+	"spendsense-backend/internal/budget"
 	"spendsense-backend/internal/category"
 	"spendsense-backend/internal/currency"
 	"spendsense-backend/internal/expense"
@@ -30,6 +31,7 @@ type Server struct {
 	incomeService   *income.Service
 	walletService   *wallet.Service
 	categoryService *category.Service
+	budgetService   *budget.Service
 	reportService   *report.Service
 	currencyService *currency.Service
 	redisCache      *infra.Redis
@@ -66,6 +68,7 @@ func NewServer(databaseURL, jwtSecret string) (*Server, error) {
 		incomeService:   income.NewService(income.NewRepository(db), wallet.NewRepository(db), currencyService),
 		walletService:   wallet.NewService(wallet.NewRepository(db), currencyService),
 		categoryService: category.NewService(category.NewRepository(db)),
+		budgetService:   budget.NewService(budget.NewRepository(db), currencyService),
 		reportService:   report.NewService(db, currencyService),
 		currencyService: currencyService,
 		redisCache:      redisCache,

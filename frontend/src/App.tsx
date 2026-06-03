@@ -5,6 +5,7 @@ import { ExpensesPage } from './pages/ExpensesPage';
 import { IncomesPage } from './pages/IncomesPage';
 import { WalletsPage } from './pages/WalletsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
+import { BudgetsPage } from './pages/BudgetsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { Login } from './pages/Login';
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/incomes" element={session ? <IncomesPage user={session.user} onLogout={handleLogout} /> : <Navigate to="/auth" replace />} />
       <Route path="/wallets" element={session ? <WalletsPage user={session.user} onLogout={handleLogout} /> : <Navigate to="/auth" replace />} />
       <Route path="/categories" element={session ? <CategoriesPage user={session.user} onLogout={handleLogout} /> : <Navigate to="/auth" replace />} />
+      <Route path="/budgets" element={session ? <BudgetsPage user={session.user} onLogout={handleLogout} /> : <Navigate to="/auth" replace />} />
       <Route path="/reports" element={session ? <ReportsPage user={session.user} onLogout={handleLogout} /> : <Navigate to="/auth" replace />} />
       <Route path="/settings" element={<Navigate to={session ? '/settings/account' : '/auth'} replace />} />
       <Route path="/settings/:tab" element={session ? <SettingsPage user={session.user} onLogout={handleLogout} /> : <Navigate to="/auth" replace />} />
