@@ -226,6 +226,7 @@ func (s *Server) routes() {
 	s.registerWalletRoutes()
 	s.registerCategoryRoutes()
 	s.registerBudgetRoutes()
+	s.registerNotificationRoutes()
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {

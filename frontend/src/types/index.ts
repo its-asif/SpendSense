@@ -64,12 +64,16 @@ export type ApiListSessionsResponse = {
   sessions: ApiSessionRow[];
 };
 
+export type CategoryKind = 'EXPENSE' | 'INCOME';
+
 export type ExpenseCategory = {
   id: string;
   name: string;
   icon?: string | null;
   color?: string | null;
+  kind: CategoryKind;
   is_default: boolean;
+  is_owned: boolean;
   created_at: string;
 };
 
@@ -189,9 +193,29 @@ export type CreateCategoryRequest = {
   name: string;
   icon?: string;
   color?: string;
+  kind: CategoryKind;
 };
 
-export type UpdateCategoryRequest = CreateCategoryRequest;
+export type AppNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  metadata?: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type NotificationListResponse = {
+  notifications: AppNotification[];
+  unread_count: number;
+};
+
+export type UpdateCategoryRequest = {
+  name: string;
+  icon?: string;
+  color?: string;
+};
 
 export type WalletListResponse = {
   wallets: Wallet[];

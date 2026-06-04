@@ -15,6 +15,7 @@ type categoryRequest struct {
 	Name  string  `json:"name"`
 	Icon  *string `json:"icon,omitempty"`
 	Color *string `json:"color,omitempty"`
+	Kind  string  `json:"kind,omitempty"`
 }
 
 type categoryResponse struct {
@@ -22,7 +23,9 @@ type categoryResponse struct {
 	Name      string  `json:"name"`
 	Icon      *string `json:"icon,omitempty"`
 	Color     *string `json:"color,omitempty"`
+	Kind      string  `json:"kind"`
 	IsDefault bool    `json:"is_default"`
+	IsOwned   bool    `json:"is_owned"`
 	CreatedAt string  `json:"created_at"`
 }
 
@@ -45,22 +48,25 @@ func (s *Server) handleCreateListCategories(w http.ResponseWriter, r *http.Reque
 			writeRequestError(w, err)
 			return
 		}
-		created, err := s.categoryService.CreateCategory(r.Context(), userID, category.CreateRequest{Name: req.Name, Icon: req.Icon, Color: req.Color})
+		created, err := s.categoryService.CreateCategory(r.Context(), userID, category.CreateRequest{
+			Name: req.Name, Icon: req.Icon, Color: req.Color, Kind: req.Kind,
+		})
 		if err != nil {
 			writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusCreated, toCategoryResponse(created))
+		writeJSON(w, http.StatusCreated, toCategoryResponse(created, userID))
 		return
 	case http.MethodGet:
-		list, err := s.categoryService.ListCategories(r.Context(), userID)
+		kind := strings.TrimSpace(r.URL.Query().Get("kind"))
+		list, err := s.categoryService.ListCategories(r.Context(), userID, kind)
 		if err != nil {
 			writeError(w, err)
 			return
 		}
 		resp := make([]categoryResponse, 0, len(list))
 		for _, it := range list {
-			resp = append(resp, toCategoryResponse(it))
+			resp = append(resp, toCategoryResponse(it, userID))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"categories": resp})
 		return
@@ -83,15 +89,16 @@ func (s *Server) handleCategoryByID(w http.ResponseWriter, r *http.Request) {
 		writeStatusError(w, http.StatusBadRequest, "INVALID_ID", "Invalid category id")
 		return
 	}
+	kind := strings.TrimSpace(r.URL.Query().Get("kind"))
 
 	switch r.Method {
 	case http.MethodGet:
-		c, err := s.categoryService.GetCategory(r.Context(), id)
+		c, err := s.categoryService.GetCategory(r.Context(), userID, id, kind)
 		if err != nil {
 			writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, toCategoryResponse(c))
+		writeJSON(w, http.StatusOK, toCategoryResponse(c, userID))
 		return
 	case http.MethodPut:
 		var req categoryRequest
@@ -99,12 +106,14 @@ func (s *Server) handleCategoryByID(w http.ResponseWriter, r *http.Request) {
 			writeRequestError(w, err)
 			return
 		}
-		updated, err := s.categoryService.UpdateCategory(r.Context(), userID, id, category.UpdateRequest{Name: req.Name, Icon: req.Icon, Color: req.Color})
+		updated, err := s.categoryService.UpdateCategory(r.Context(), userID, id, category.UpdateRequest{
+			Name: req.Name, Icon: req.Icon, Color: req.Color,
+		})
 		if err != nil {
 			writeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, toCategoryResponse(updated))
+		writeJSON(w, http.StatusOK, toCategoryResponse(updated, userID))
 		return
 	case http.MethodDelete:
 		if err := s.categoryService.DeleteCategory(r.Context(), userID, id); err != nil {
@@ -119,10 +128,16 @@ func (s *Server) handleCategoryByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func toCategoryResponse(c *category.Category) categoryResponse {
-	var uid string
-	if c.ID != uuid.Nil {
-		uid = c.ID.String()
+func toCategoryResponse(c *category.Category, viewerID uuid.UUID) categoryResponse {
+	owned := c.UserID != nil && *c.UserID == viewerID
+	return categoryResponse{
+		ID:        c.ID.String(),
+		Name:      c.Name,
+		Icon:      c.Icon,
+		Color:     c.Color,
+		Kind:      c.Kind,
+		IsDefault: c.IsDefault,
+		IsOwned:   owned,
+		CreatedAt: c.CreatedAt.Format(time.RFC3339),
 	}
-	return categoryResponse{ID: uid, Name: c.Name, Icon: c.Icon, Color: c.Color, IsDefault: c.IsDefault, CreatedAt: c.CreatedAt.Format(time.RFC3339)}
 }

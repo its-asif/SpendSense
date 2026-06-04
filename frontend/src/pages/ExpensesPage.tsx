@@ -71,6 +71,7 @@ export function ExpensesPage({ user, onLogout }: ExpensesPageProps) {
     setExpenses((current) => [created, ...current]);
     setCurrentPage(1);
     void syncWallets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Expense created');
   };
 
@@ -83,6 +84,7 @@ export function ExpensesPage({ user, onLogout }: ExpensesPageProps) {
     setExpenses((current) => current.map((expense) => (expense.id === updated.id ? updated : expense)));
     setEditingExpense(null);
     void syncWallets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Expense updated');
   };
 
@@ -97,6 +99,7 @@ export function ExpensesPage({ user, onLogout }: ExpensesPageProps) {
         setEditingExpense(null);
       }
       void syncWallets();
+      window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
       toast.success('Expense deleted');
     } catch {
       setError('Failed to delete expense.');

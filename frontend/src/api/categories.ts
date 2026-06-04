@@ -1,8 +1,10 @@
 import client from './client';
-import type { CreateCategoryRequest, ExpenseCategory, UpdateCategoryRequest } from '../types';
+import type { CategoryKind, CreateCategoryRequest, ExpenseCategory, UpdateCategoryRequest } from '../types';
 
-export async function listCategories(): Promise<ExpenseCategory[]> {
-  const response = await client.get<{ categories: ExpenseCategory[] }>('/api/v1/categories');
+export async function listCategories(kind?: CategoryKind): Promise<ExpenseCategory[]> {
+  const response = await client.get<{ categories: ExpenseCategory[] }>('/api/v1/categories', {
+    params: kind ? { kind } : undefined,
+  });
   return response.data.categories;
 }
 

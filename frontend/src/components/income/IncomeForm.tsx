@@ -114,7 +114,7 @@ export function IncomeForm({ categories, wallets, onSubmit, initialIncome, onCan
     >
       <div className="grid gap-4 md:grid-cols-2">
         <WalletSelector wallets={wallets} value={walletId} onChange={setWalletId} disabled={isSaving} />
-        <CategorySelector categories={categories} value={categoryId} onChange={setCategoryId} disabled={isSaving} />
+        <CategorySelector categories={categories} value={categoryId} onChange={setCategoryId} disabled={isSaving} kind="INCOME" label="Income category" />
         <Input label="Amount" type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="5000.00" required />
         <CurrencySelector currencies={currencyOptions} value={currency} onChange={setCurrency} disabled={isSaving} loading={isLoadingCurrencies} />
         <Input label="Date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />

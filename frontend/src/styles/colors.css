@@ -97,16 +97,16 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --color-background-rgb: 248 250 252;
+  --color-background-rgb: 236 241 247;
   --color-foreground-rgb: 15 23 42;
-  --color-card-rgb: 255 255 255;
+  --color-card-rgb: 244 247 251;
   --color-card-foreground-rgb: 15 23 42;
-  --color-popover-rgb: 255 255 255;
+  --color-popover-rgb: 244 247 251;
   --color-popover-foreground-rgb: 15 23 42;
-  --color-muted-rgb: 226 232 240;
+  --color-muted-rgb: 214 222 234;
   --color-muted-foreground-rgb: 71 85 105;
-  --color-border-rgb: 203 213 225;
-  --color-input-rgb: 203 213 225;
+  --color-border-rgb: 188 200 216;
+  --color-input-rgb: 214 222 234;
   --color-ring-rgb: 59 130 246;
   --color-destructive-rgb: 220 38 38;
   --color-destructive-foreground-rgb: 255 255 255;

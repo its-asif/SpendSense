@@ -232,6 +232,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   }, [transferFromWallet]);
   const {
     categories,
+    incomeCategories,
     wallets,
     isLoadingMeta,
     metaError,
@@ -317,33 +318,21 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     };
   }, [settings.defaultCurrency]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadWidgets() {
-      setIsLoadingWidgets(true);
-
-      try {
-        const response = await getDashboardWidgets(settings.defaultCurrency);
-        if (!cancelled) {
-          setDashboardWidgets(response);
-        }
-      } catch {
-        if (!cancelled) {
-          setWidgetsError('Failed to load dashboard widgets.');
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingWidgets(false);
-        }
-      }
+  const refreshWidgets = async () => {
+    setWidgetsError(null);
+    setIsLoadingWidgets(true);
+    try {
+      const response = await getDashboardWidgets(settings.defaultCurrency);
+      setDashboardWidgets(response);
+    } catch {
+      setWidgetsError('Failed to refresh dashboard widgets.');
+    } finally {
+      setIsLoadingWidgets(false);
     }
+  };
 
-    void loadWidgets();
-
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    void refreshWidgets();
   }, [settings.defaultCurrency]);
 
   useEffect(() => {
@@ -580,6 +569,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const refreshMeta = async () => {
     await refreshDashboardMeta();
     await refreshSummary();
+    await refreshWidgets();
     // Clear any active edit when meta is refreshed to avoid stale selections
     setEditingExpense(null);
     setEditingIncome(null);
@@ -671,6 +661,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     setManageExpensesOpen(false);
     void syncDashboardWallets();
     void refreshSummary();
+    void refreshWidgets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Expense created');
   };
 
@@ -684,6 +676,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     setEditingExpense(null);
     void syncDashboardWallets();
     void refreshSummary();
+    void refreshWidgets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Expense updated');
   };
 
@@ -699,6 +693,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       }
       void syncDashboardWallets();
       void refreshSummary();
+      void refreshWidgets();
+      window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
       return true;
     } catch {
       setError('Failed to delete expense.');
@@ -715,6 +711,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     setManageIncomesOpen(false);
     await syncDashboardWallets();
     await refreshSummary();
+    await refreshWidgets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Income created');
   };
 
@@ -728,6 +726,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     setEditingIncome(null);
     await syncDashboardWallets();
     await refreshSummary();
+    await refreshWidgets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Income updated');
   };
 
@@ -743,6 +743,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       }
       await syncDashboardWallets();
       await refreshSummary();
+      await refreshWidgets();
+      window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
       return true;
     } catch {
       setError('Failed to delete income.');
@@ -789,6 +791,9 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
         setExpenses((cur) => [restored, ...cur]);
         void syncDashboardWallets();
+        void refreshSummary();
+        void refreshWidgets();
+        window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
       },
       'Restored expense',
       'Failed to restore expense',
@@ -821,6 +826,9 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
         setIncomes((cur) => [restored, ...cur]);
         void syncDashboardWallets();
+        void refreshSummary();
+        void refreshWidgets();
+        window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
       },
       'Restored income',
       'Failed to restore income',
@@ -858,14 +866,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const kpiSafeToSpendTrend = `Net this month ${formatCurrency(netThisMonth, currencyForFormatting, settings.locale)}`;
   const kpiSafeToSpendDirection = netThisMonth >= 0 ? 'up' as const : 'down' as const;
 
-  const spendingByDay = dashboardSummary?.daily_spending ?? [];
-
-  const maxDailySpending = Math.max(...spendingByDay.map((entry) => entry.total), 1);
-  const spendingBars = spendingByDay.map((entry) => ({
-    label: entry.label,
-    value: Math.max(Math.round((entry.total / maxDailySpending) * 100), entry.total > 0 ? 12 : 8),
-  }));
-
   const walletRows = wallets.slice(0, 3).map((wallet) => {
     const opening = Number(wallet.opening_balance ?? 0);
     const current = Number(wallet.current_balance ?? 0);
@@ -886,19 +886,10 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     .slice()
     .sort((a, b) => b.total - a.total)
     .slice(0, 4);
-  const maxCategoryTotal = Math.max(...categoryBreakdown.map((item) => item.total), 1);
-  const budgetRows = categoryBreakdown.length > 0
-    ? categoryBreakdown.map((item, index) => ({
-        name: item.name,
-        spent: Math.max(Math.round((item.total / maxCategoryTotal) * 100), 10),
-        color: ['bg-accent-blue', 'bg-accent-green', 'bg-accent-amber', 'bg-accent-purple'][index % 4],
-      }))
-    : [
-        { name: 'No spending yet', spent: 0, color: 'bg-accent-blue' },
-      ];
 
-  const nearlyCompleteGoalsDynamic = budgetRows.filter((row) => row.spent >= 75).length;
-  const activeGoalsCount = budgetRows.length;
+  const monthlyBudgetRows = (dashboardWidgets?.budgets ?? []).slice(0, 5);
+  const nearlyCompleteGoalsDynamic = monthlyBudgetRows.filter((row) => row.usage_percent >= 75).length;
+  const activeGoalsCount = monthlyBudgetRows.length;
   const nearlyCompleteGoals = nearlyCompleteGoalsDynamic;
   const kpiActiveGoals = String(activeGoalsCount);
   const kpiActiveGoalsTrend = `${nearlyCompleteGoals} goals nearly complete`;
@@ -921,7 +912,11 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const trendValueDelta = latestTrendChangePercent === null ? null : `${latestTrendChangePercent >= 0 ? '+' : ''}${latestTrendChangePercent.toFixed(2)}%`;
   const trendHeaderLabel = selectedTrendOption.label;
   const trendArrowDirection = latestTrendDirection === 'up' ? 'up' : 'down';
-  const monthlyBudgetRows = (dashboardWidgets?.budgets ?? []).slice(0, 5);
+  const cashFlowMonths = (
+    dashboardWidgets?.monthly_cash_flow?.length ? dashboardWidgets.monthly_cash_flow : monthlyCashFlowPoints
+  ).slice(-6);
+  const cashFlowBarMax = Math.max(...cashFlowMonths.map((point) => Math.max(point.income, point.expenses)), 1);
+
   const categoryMetaByID = new Map(
     categories.map((category, index) => [category.id, { name: category.name, color: category.color ?? ['#6366F1', '#10B981', '#F59E0B', '#A855F7'][index % 4] }]),
   );
@@ -1006,26 +1001,35 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.85fr]">
         <Card
           title="Cash flow overview"
-          subtitle="Monthly inflow versus outflow"
-          action={<Button variant="secondary">This month</Button>}
-          footer={<p className="text-sm text-text-secondary">Monthly spending stays within target when incomes outpace expenses.</p>}
+          subtitle="Monthly income versus expenses (last 6 months)"
+          footer={<p className="text-sm text-text-secondary">Positive cash flow means you earned more than you spent this month.</p>}
         >
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
-              <div className="flex h-64 items-end gap-3 rounded-3xl border border-dark-elevated bg-dark-bg p-4">
-                {spendingBars.map((bar) => (
-                  <div key={bar.label} className="flex h-full flex-1 flex-col items-center gap-2">
-                    <div className="flex h-full w-full items-end justify-center">
-                      <div
-                        className="w-full max-w-10 rounded-t-2xl bg-gradient-to-t from-accent-blue to-accent-green shadow-lg shadow-accent-blue/10"
-                        style={{ height: `${bar.value}%` }}
-                      />
+              <div className="flex h-64 items-end gap-2 rounded-3xl border border-dark-elevated bg-dark-bg p-4">
+                {cashFlowMonths.length > 0 ? (
+                  cashFlowMonths.map((point) => (
+                    <div key={point.month} className="flex h-full flex-1 flex-col items-center gap-2">
+                      <div className="flex h-full w-full items-end justify-center gap-1">
+                        <div
+                          className="w-full max-w-3 rounded-t-md bg-accent-green"
+                          style={{ height: `${Math.max((point.income / cashFlowBarMax) * 100, point.income > 0 ? 8 : 2)}%` }}
+                          title={`Income ${formatCurrency(point.income, currencyForFormatting, settings.locale)}`}
+                        />
+                        <div
+                          className="w-full max-w-3 rounded-t-md bg-accent-amber"
+                          style={{ height: `${Math.max((point.expenses / cashFlowBarMax) * 100, point.expenses > 0 ? 8 : 2)}%` }}
+                          title={`Expenses ${formatCurrency(point.expenses, currencyForFormatting, settings.locale)}`}
+                        />
+                      </div>
+                      <p className="text-xs text-text-muted">{point.label}</p>
                     </div>
-                    <p className="text-xs text-text-muted">{bar.label}</p>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="m-auto text-sm text-text-muted">No cash flow data yet</p>
+                )}
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-dark-elevated bg-dark-bg p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Income</p>
                   <p className="mt-2 font-mono text-xl font-semibold text-accent-green">{formatCurrency(monthlyIncomes, currencyForFormatting, settings.locale)}</p>
@@ -1034,25 +1038,32 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Spent</p>
                   <p className="mt-2 font-mono text-xl font-semibold text-accent-amber">{formatCurrency(monthlyExpenses, currencyForFormatting, settings.locale)}</p>
                 </div>
-                <div className="rounded-2xl border border-dark-elevated bg-dark-bg p-4 sm:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Saved</p>
+                <div className="rounded-2xl border border-dark-elevated bg-dark-bg p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Net</p>
                   <p className="mt-2 font-mono text-xl font-semibold text-accent-blue">{formatCurrency(monthlySavings, currencyForFormatting, settings.locale)}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              {budgetRows.map((budget) => (
-                <div key={budget.name} className="rounded-2xl border border-dark-elevated bg-dark-bg p-4">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <p className="font-semibold text-text-primary">{budget.name}</p>
-                    <p className="text-text-muted">{budget.spent}% used</p>
+              {monthlyBudgetRows.length > 0 ? (
+                monthlyBudgetRows.map((budget) => (
+                  <div key={budget.id} className="rounded-2xl border border-dark-elevated bg-dark-bg p-4">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <p className="font-semibold text-text-primary">{budget.category_name}</p>
+                      <p className="text-text-muted">{Math.round(budget.usage_percent)}%</p>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-dark-elevated">
+                      <div
+                        className="h-full rounded-full bg-accent-blue"
+                        style={{ width: `${Math.min(Math.max(budget.usage_percent, 0), 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-dark-elevated">
-                    <div className={`h-full rounded-full ${budget.color}`} style={{ width: `${budget.spent}%` }} />
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-text-muted">Add monthly budgets to track category limits here.</p>
+              )}
             </div>
           </div>
         </Card>
@@ -1294,7 +1305,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       {editingIncome && (
         <Modal title="Edit income" onClose={() => setEditingIncome(null)}>
           <IncomeForm
-            categories={categories}
+            categories={incomeCategories}
             wallets={wallets}
             onSubmit={handleUpdateIncome}
             initialIncome={editingIncome}
@@ -1332,6 +1343,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 await updateWallet(editingWallet.id, data);
                 toast.success('Wallet updated');
                 void refreshMeta();
+                window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 setEditingWallet(null);
               } catch {
                 toast.error('Failed to update wallet');
@@ -1350,6 +1362,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 await createWallet(data);
                 toast.success('Wallet created');
                 await refreshMeta();
+                window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 setCreatingWallet(false);
               } catch {
                 toast.error('Failed to create wallet');
@@ -1372,7 +1385,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 try {
                   await deleteWallet(pendingWalletDelete.id);
                   toast.success('Wallet deleted');
-                  void refreshMeta();
+                  await refreshMeta();
+                  window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 } catch {
                   toast.error('Failed to delete wallet');
                 } finally {
@@ -1426,6 +1440,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
                       void refreshMeta();
                       void syncDashboardWallets();
+                      window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                     } catch (e) {
                       throw e;
                     }
@@ -1436,6 +1451,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
                 void refreshMeta();
                 void syncDashboardWallets();
+                window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 setTransferFromWallet(null);
               } catch {
                 toast.error('Failed to create transfer');
@@ -1486,7 +1502,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       {manageIncomesOpen && (
         <Modal title="Add income" onClose={() => setManageIncomesOpen(false)}>
           <IncomeForm
-            categories={categories}
+            categories={incomeCategories}
             wallets={wallets}
             onSubmit={handleCreateIncome}
             onCancel={() => setManageIncomesOpen(false)}

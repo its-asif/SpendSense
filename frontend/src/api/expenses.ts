@@ -40,8 +40,8 @@ export async function deleteExpense(id: string): Promise<void> {
   await client.delete(`/api/v1/expenses/${id}`);
 }
 
-export async function listCategories(): Promise<CategoryListResponse['categories']> {
-  const response = await client.get<CategoryListResponse>('/api/v1/categories');
+export async function listCategories(kind: 'EXPENSE' | 'INCOME' = 'EXPENSE'): Promise<CategoryListResponse['categories']> {
+  const response = await client.get<CategoryListResponse>('/api/v1/categories', { params: { kind } });
   return response.data.categories;
 }
 

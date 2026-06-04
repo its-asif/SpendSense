@@ -20,7 +20,7 @@ func NewRepository(db *infra.Database) *Repository { return &Repository{db: db} 
 func (r *Repository) CategoryAccessible(ctx context.Context, userID, categoryID uuid.UUID) (bool, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT 1 FROM categories
-		WHERE id = $1 AND (user_id = $2 OR is_default = TRUE)
+		WHERE id = $1 AND kind = 'EXPENSE' AND (user_id = $2 OR is_default = TRUE)
 		LIMIT 1
 	`, categoryID, userID)
 	var marker int

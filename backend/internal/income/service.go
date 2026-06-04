@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"spendsense-backend/internal/category"
 	"spendsense-backend/internal/currency"
 	"spendsense-backend/internal/domain"
 	"spendsense-backend/internal/wallet"
@@ -17,15 +18,20 @@ type walletLookup interface {
 	GetWalletByID(ctx context.Context, userID, id uuid.UUID) (*wallet.Wallet, error)
 }
 
+type categoryGuard interface {
+	AssertAccessible(ctx context.Context, userID, categoryID uuid.UUID, kind string) error
+}
+
 type Service struct {
 	repo         Store
 	walletLookup walletLookup
+	categories   categoryGuard
 	currencySvc  *currency.Service
 	now          func() time.Time
 }
 
-func NewService(repo Store, walletLookup walletLookup, currencySvc *currency.Service) *Service {
-	return &Service{repo: repo, walletLookup: walletLookup, currencySvc: currencySvc, now: time.Now}
+func NewService(repo Store, walletLookup walletLookup, categories categoryGuard, currencySvc *currency.Service) *Service {
+	return &Service{repo: repo, walletLookup: walletLookup, categories: categories, currencySvc: currencySvc, now: time.Now}
 }
 
 func (s *Service) CreateIncome(ctx context.Context, userID uuid.UUID, req CreateRequest) (*Income, error) {
@@ -39,6 +45,11 @@ func (s *Service) CreateIncome(ctx context.Context, userID uuid.UUID, req Create
 	}
 	if err := s.normalizeCurrency(ctx, userID, validated); err != nil {
 		return nil, err
+	}
+	if validated.CategoryID != nil && s.categories != nil {
+		if err := s.categories.AssertAccessible(ctx, userID, *validated.CategoryID, category.KindIncome); err != nil {
+			return nil, err
+		}
 	}
 
 	income := &Income{

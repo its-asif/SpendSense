@@ -88,6 +88,7 @@ func (s *Server) handleCreateListExpenses(w http.ResponseWriter, r *http.Request
 			writeError(w, err)
 			return
 		}
+		s.scheduleNotificationChecks(userID)
 
 		writeJSON(w, http.StatusCreated, toExpenseResponse(created))
 		return
@@ -211,6 +212,7 @@ func (s *Server) handleExpenseByID(w http.ResponseWriter, r *http.Request) {
 			writeError(w, err)
 			return
 		}
+		s.scheduleNotificationChecks(userID)
 		writeJSON(w, http.StatusOK, toExpenseResponse(updated))
 		return
 	case http.MethodDelete:
@@ -218,6 +220,7 @@ func (s *Server) handleExpenseByID(w http.ResponseWriter, r *http.Request) {
 			writeError(w, err)
 			return
 		}
+		s.scheduleNotificationChecks(userID)
 		writeJSON(w, http.StatusNoContent, nil)
 		return
 	default:

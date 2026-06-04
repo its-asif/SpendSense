@@ -4,6 +4,7 @@ import type { ExpenseCategory, Wallet } from '../types';
 
 export function useDashboardMeta() {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  const [incomeCategories, setIncomeCategories] = useState<ExpenseCategory[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [isLoadingMeta, setIsLoadingMeta] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
@@ -13,8 +14,13 @@ export function useDashboardMeta() {
     setIsLoadingMeta(true);
 
     try {
-      const [nextCategories, nextWallets] = await Promise.all([listCategories(), listWallets()]);
-      setCategories(nextCategories);
+      const [expenseCategories, nextIncomeCategories, nextWallets] = await Promise.all([
+        listCategories('EXPENSE'),
+        listCategories('INCOME'),
+        listWallets(),
+      ]);
+      setCategories(expenseCategories);
+      setIncomeCategories(nextIncomeCategories);
       setWallets(nextWallets);
     } catch {
       setMetaError('Failed to refresh categories or wallets.');
@@ -38,12 +44,11 @@ export function useDashboardMeta() {
 
   return {
     categories,
+    incomeCategories,
     wallets,
     isLoadingMeta,
     metaError,
     refreshMeta,
     syncWallets,
-    setCategories,
-    setWallets,
   };
 }

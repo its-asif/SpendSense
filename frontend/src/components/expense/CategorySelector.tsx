@@ -1,16 +1,20 @@
-import type { ExpenseCategory } from '../../types';
+import type { CategoryKind, ExpenseCategory } from '../../types';
 
 type CategorySelectorProps = {
   categories: ExpenseCategory[];
   value: string;
   onChange: (categoryId: string) => void;
   disabled?: boolean;
+  kind?: CategoryKind;
+  label?: string;
 };
 
-export function CategorySelector({ categories, value, onChange, disabled }: CategorySelectorProps) {
+export function CategorySelector({ categories, value, onChange, disabled, kind, label = 'Category' }: CategorySelectorProps) {
+  const filtered = kind ? categories.filter((category) => category.kind === kind) : categories;
+
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-text-secondary">Category</span>
+      <span className="mb-1.5 block text-xs font-semibold text-text-secondary">{label}</span>
       <select
         className="input"
         value={value}
@@ -18,9 +22,9 @@ export function CategorySelector({ categories, value, onChange, disabled }: Cate
         disabled={disabled}
       >
         <option value="">Select category</option>
-        {categories.map((category) => (
+        {filtered.map((category) => (
           <option key={category.id} value={category.id}>
-            {category.name}
+            {category.is_default ? category.name : `${category.name} (yours)`}
           </option>
         ))}
       </select>

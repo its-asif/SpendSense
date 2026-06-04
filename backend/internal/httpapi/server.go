@@ -18,6 +18,7 @@ import (
 	"spendsense-backend/internal/income"
 	"spendsense-backend/internal/infra"
 	"spendsense-backend/internal/middleware"
+	"spendsense-backend/internal/notification"
 	"spendsense-backend/internal/report"
 	"spendsense-backend/internal/wallet"
 )
@@ -31,8 +32,9 @@ type Server struct {
 	incomeService   *income.Service
 	walletService   *wallet.Service
 	categoryService *category.Service
-	budgetService   *budget.Service
-	reportService   *report.Service
+	budgetService         *budget.Service
+	notificationService   *notification.Service
+	reportService         *report.Service
 	currencyService *currency.Service
 	redisCache      *infra.Redis
 	httpServer      *http.Server
@@ -59,17 +61,22 @@ func NewServer(databaseURL, jwtSecret string) (*Server, error) {
 		return nil, fmt.Errorf("failed to initialize currency service: %w", err)
 	}
 
+	categoryRepo := category.NewRepository(db)
+	categoryService := category.NewService(categoryRepo)
+	walletRepo := wallet.NewRepository(db)
+
 	server := &Server{
 		db:              db,
 		authService:     auth.NewAuthService(db, auth.NewJWTManager(jwtSecret)),
 		authMiddleware:  middleware.NewAuthMiddleware(auth.NewJWTManager(jwtSecret), db),
 		mux:             http.NewServeMux(),
-		expenseService:  expense.NewService(expense.NewRepository(db), wallet.NewRepository(db), currencyService),
-		incomeService:   income.NewService(income.NewRepository(db), wallet.NewRepository(db), currencyService),
-		walletService:   wallet.NewService(wallet.NewRepository(db), currencyService),
-		categoryService: category.NewService(category.NewRepository(db)),
-		budgetService:   budget.NewService(budget.NewRepository(db), currencyService),
-		reportService:   report.NewService(db, currencyService),
+		categoryService: categoryService,
+		expenseService:  expense.NewService(expense.NewRepository(db), walletRepo, categoryService, currencyService),
+		incomeService:   income.NewService(income.NewRepository(db), walletRepo, categoryService, currencyService),
+		walletService:   wallet.NewService(walletRepo, currencyService),
+		budgetService:         budget.NewService(budget.NewRepository(db), currencyService),
+		notificationService:   notification.NewService(db),
+		reportService:         report.NewService(db, currencyService),
 		currencyService: currencyService,
 		redisCache:      redisCache,
 	}

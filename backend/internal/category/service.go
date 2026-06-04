@@ -2,7 +2,7 @@ package category
 
 import (
 	"context"
-	"time"
+	"strings"
 
 	"spendsense-backend/internal/domain"
 
@@ -14,42 +14,92 @@ type Service struct{ repo *Repository }
 func NewService(r *Repository) *Service { return &Service{repo: r} }
 
 func (s *Service) CreateCategory(ctx context.Context, userID uuid.UUID, req CreateRequest) (*Category, error) {
-	if req.Name == "" {
+	if strings.TrimSpace(req.Name) == "" {
 		return nil, domain.NewDomainError(domain.ErrInvalidCategory, "name required", 400)
 	}
-	c := &Category{ID: uuid.New(), Name: req.Name, Icon: req.Icon, Color: req.Color, IsDefault: false, CreatedAt: time.Time{}}
+	kind, err := normalizeKind(req.Kind)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &Category{
+		ID:    uuid.New(),
+		Name:  strings.TrimSpace(req.Name),
+		Icon:  req.Icon,
+		Color: req.Color,
+		Kind:  kind,
+	}
 	if err := s.repo.CreateCategory(ctx, userID, c); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-func (s *Service) GetCategory(ctx context.Context, id uuid.UUID) (*Category, error) {
-	c, err := s.repo.GetCategoryByID(ctx, id, nil)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+func (s *Service) GetCategory(ctx context.Context, userID, id uuid.UUID, kind string) (*Category, error) {
+	return s.repo.GetCategoryByID(ctx, id, &userID, kind)
 }
 
-func (s *Service) ListCategories(ctx context.Context, userID uuid.UUID) ([]*Category, error) {
-	return s.repo.ListCategories(ctx, userID)
+func (s *Service) ListCategories(ctx context.Context, userID uuid.UUID, kind string) ([]*Category, error) {
+	normalized, err := normalizeKind(kind)
+	if err != nil && kind != "" {
+		return nil, err
+	}
+	if kind == "" {
+		normalized = KindExpense
+	}
+	return s.repo.ListCategories(ctx, userID, normalized)
 }
 
 func (s *Service) UpdateCategory(ctx context.Context, userID uuid.UUID, id uuid.UUID, req UpdateRequest) (*Category, error) {
-	c, err := s.repo.GetCategoryByID(ctx, id, &userID)
+	existing, err := s.repo.GetCategoryByID(ctx, id, &userID, "")
 	if err != nil {
 		return nil, err
 	}
-	c.Name = req.Name
-	c.Icon = req.Icon
-	c.Color = req.Color
-	if err := s.repo.UpdateCategory(ctx, userID, c); err != nil {
+	if existing.IsDefault {
+		return nil, domain.NewDomainError(domain.ErrForbidden, "default categories cannot be edited", 403)
+	}
+	if existing.UserID == nil || *existing.UserID != userID {
+		return nil, domain.NewDomainError(domain.ErrNotFound, "category not found", 404)
+	}
+
+	existing.Name = strings.TrimSpace(req.Name)
+	existing.Icon = req.Icon
+	existing.Color = req.Color
+	if err := s.repo.UpdateCategory(ctx, userID, existing); err != nil {
 		return nil, err
 	}
-	return c, nil
+	return existing, nil
+}
+
+func (s *Service) AssertAccessible(ctx context.Context, userID, categoryID uuid.UUID, kind string) error {
+	normalized, err := normalizeKind(kind)
+	if err != nil {
+		return err
+	}
+	_, err = s.repo.GetCategoryByID(ctx, categoryID, &userID, normalized)
+	return err
 }
 
 func (s *Service) DeleteCategory(ctx context.Context, userID, id uuid.UUID) error {
+	existing, err := s.repo.GetCategoryByID(ctx, id, &userID, "")
+	if err != nil {
+		return err
+	}
+	if existing.IsDefault {
+		return domain.NewDomainError(domain.ErrForbidden, "default categories cannot be deleted", 403)
+	}
 	return s.repo.DeleteCategory(ctx, userID, id)
+}
+
+func normalizeKind(kind string) (string, error) {
+	normalized := strings.ToUpper(strings.TrimSpace(kind))
+	if normalized == "" {
+		return KindExpense, nil
+	}
+	switch normalized {
+	case KindExpense, KindIncome:
+		return normalized, nil
+	default:
+		return "", domain.NewDomainErrorWithField(domain.ErrInvalidCategory, "kind must be EXPENSE or INCOME", "kind", 400)
+	}
 }

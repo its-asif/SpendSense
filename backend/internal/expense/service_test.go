@@ -37,7 +37,7 @@ func (f *fakeExpenseStore) SoftDeleteExpense(ctx context.Context, userID, expens
 
 func TestCreateExpenseValidation(t *testing.T) {
 	repo := &fakeExpenseStore{}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 	uid := uuid.New()
 
 	// missing wallet
@@ -93,7 +93,7 @@ func TestCreateExpenseValidation(t *testing.T) {
 
 func TestListExpensesPassesFilters(t *testing.T) {
 	repo := &fakeExpenseStore{}
-	svc := NewService(repo, nil, nil)
+	svc := NewService(repo, nil, nil, nil)
 	uid := uuid.New()
 	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)

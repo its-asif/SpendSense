@@ -321,6 +321,7 @@ export function WalletsPage({ user, onLogout }: WalletsPageProps) {
                 await createWallet(data);
                 toast.success('Wallet created');
                 await refreshMeta();
+                window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 setCreatingWallet(false);
               } catch {
                 toast.error('Failed to create wallet');
@@ -340,6 +341,7 @@ export function WalletsPage({ user, onLogout }: WalletsPageProps) {
                 await updateWallet(editingWallet.id, data);
                 toast.success('Wallet updated');
                 await refreshMeta();
+                window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 setEditingWallet(null);
               } catch {
                 toast.error('Failed to update wallet');
@@ -363,6 +365,7 @@ export function WalletsPage({ user, onLogout }: WalletsPageProps) {
                 toast.success('Transfer created');
                 await refreshMeta();
                 void syncWallets();
+                window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 setTransferFromWallet(null);
               } catch {
                 toast.error('Failed to create transfer');
@@ -385,6 +388,7 @@ export function WalletsPage({ user, onLogout }: WalletsPageProps) {
                   await deleteWallet(pendingDelete.id);
                   toast.success('Wallet deleted');
                   await refreshMeta();
+                  window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                   setPendingDelete(null);
                 } catch {
                   toast.error('Failed to delete wallet');

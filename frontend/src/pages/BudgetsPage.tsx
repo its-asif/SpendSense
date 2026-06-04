@@ -47,7 +47,7 @@ export function BudgetsPage({ user, onLogout }: BudgetsPageProps) {
   const refresh = async () => {
     setIsLoading(true);
     try {
-      const [budgetItems, categoryItems] = await Promise.all([listBudgets('MONTHLY'), listCategories()]);
+      const [budgetItems, categoryItems] = await Promise.all([listBudgets('MONTHLY'), listCategories('EXPENSE')]);
       setBudgets(budgetItems);
       setCategories(categoryItems);
     } catch {
@@ -87,6 +87,7 @@ export function BudgetsPage({ user, onLogout }: BudgetsPageProps) {
       setBudgets((current) => [...current, created].sort((a, b) => a.category_name.localeCompare(b.category_name)));
       setCategoryId('');
       setAmount('');
+      window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
       toast.success('Monthly budget created');
     } catch (error) {
       toast.error(apiErrorMessage(error, 'Failed to create budget'));
@@ -105,6 +106,8 @@ export function BudgetsPage({ user, onLogout }: BudgetsPageProps) {
               value={categoryId}
               onChange={setCategoryId}
               disabled={availableCategories.length === 0}
+              kind="EXPENSE"
+              label="Expense category"
             />
             {availableCategories.length === 0 && (
               <p className="text-sm text-text-muted">Every category already has a monthly budget, or no categories are available.</p>
@@ -197,6 +200,7 @@ export function BudgetsPage({ user, onLogout }: BudgetsPageProps) {
                     .sort((a, b) => a.category_name.localeCompare(b.category_name)),
                 );
                 setEditingBudget(null);
+                window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                 toast.success('Budget updated');
               } catch (error) {
                 toast.error(apiErrorMessage(error, 'Failed to update budget'));
@@ -238,6 +242,7 @@ export function BudgetsPage({ user, onLogout }: BudgetsPageProps) {
                   await deleteBudget(pendingDelete.id);
                   setBudgets((current) => current.filter((item) => item.id !== pendingDelete.id));
                   setPendingDelete(null);
+                  window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
                   toast.success('Budget deleted');
                 } catch {
                   toast.error('Failed to delete budget');

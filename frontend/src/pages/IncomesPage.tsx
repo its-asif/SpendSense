@@ -28,7 +28,7 @@ export function IncomesPage({ user, onLogout }: IncomesPageProps) {
   const [deletingIncomeId, setDeletingIncomeId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const { categories, wallets, syncWallets } = useDashboardMeta();
+  const { incomeCategories: categories, wallets, syncWallets } = useDashboardMeta();
 
   const refreshIncomes = async () => {
     setError(null);
@@ -71,6 +71,7 @@ export function IncomesPage({ user, onLogout }: IncomesPageProps) {
     setIncomes((current) => [created, ...current]);
     setCurrentPage(1);
     void syncWallets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Income created');
   };
 
@@ -83,6 +84,7 @@ export function IncomesPage({ user, onLogout }: IncomesPageProps) {
     setIncomes((current) => current.map((income) => (income.id === updated.id ? updated : income)));
     setEditingIncome(null);
     void syncWallets();
+    window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
     toast.success('Income updated');
   };
 
@@ -97,6 +99,7 @@ export function IncomesPage({ user, onLogout }: IncomesPageProps) {
         setEditingIncome(null);
       }
       void syncWallets();
+      window.dispatchEvent(new CustomEvent('spendsense-refresh-notifications'));
       toast.success('Income deleted');
     } catch {
       setError('Failed to delete income.');
