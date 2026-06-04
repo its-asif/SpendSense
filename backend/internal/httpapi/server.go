@@ -48,6 +48,10 @@ func NewServer(databaseURL, jwtSecret string) (*Server, error) {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	if err := db.AutoMigrateRecurringPayments(context.Background()); err != nil {
+		log.Printf("recurring_payments automigration failed: %v", err)
+	}
+
 	var redisCache *infra.Redis
 	if redisURL := strings.TrimSpace(os.Getenv("REDIS_URL")); redisURL != "" {
 		redisCache, err = infra.NewRedis(redisURL)

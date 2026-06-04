@@ -102,8 +102,29 @@ func (s *Service) dashboardSummary(ctx context.Context, userID uuid.UUID, curren
 		monthlyChange = &value
 	}
 
+	// Sum unpaid recurring costs for this month
+	rowsRP, err := s.db.Query(ctx, `
+		SELECT amount, currency
+		FROM recurring_payments
+		WHERE user_id = $1 AND status = 'unpaid' AND deadline >= $2::date AND deadline < $3::date
+	`, userID, currentMonthStart.Format("2006-01-02"), nextMonthStart.Format("2006-01-02"))
+	var monthlyFutureCost float64
+	if err == nil {
+		defer rowsRP.Close()
+		conversionCacheRP := map[string]float64{}
+		for rowsRP.Next() {
+			var rpAmt float64
+			var rpCurr string
+			if err := rowsRP.Scan(&rpAmt, &rpCurr); err == nil {
+				if convAmt, err := s.convertAmount(ctx, rpAmt, rpCurr, baseCurrency, conversionCacheRP); err == nil {
+					monthlyFutureCost += convAmt
+				}
+			}
+		}
+	}
+
 	netThisMonth := round2(monthlyIncome - monthlyExpenses)
-	safeToSpend := round2(totalBalance)
+	safeToSpend := round2(totalBalance - monthlyFutureCost)
 	monthlySavings := round2(math.Max(netThisMonth, 0))
 
 	return &DashboardSummary{

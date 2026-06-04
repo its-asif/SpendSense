@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { dismissNotification, listNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications';
+import { postRecurringExpense } from '../../api/expenses';
 import type { AppNotification } from '../../types';
 
 function formatRelativeTime(iso: string): string {
@@ -126,6 +127,17 @@ export function HeaderNotificationsButton() {
                       </div>
                       <p className="mt-1 text-sm leading-5 text-text-secondary">{notification.body}</p>
                       <div className="mt-2 flex gap-2">
+                        {notification.type === 'recurring_due' && (
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-accent-green hover:underline"
+                            onClick={() => {
+                              window.location.href = '/recurring';
+                            }}
+                          >
+                            Manage & Pay
+                          </button>
+                        )}
                         {!notification.is_read && (
                           <button
                             type="button"

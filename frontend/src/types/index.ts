@@ -132,6 +132,7 @@ export type Expense = {
   recurring_rule?: string | null;
   created_at: string;
   updated_at: string;
+  receipt_url?: string | null;
 };
 
 export type Income = {

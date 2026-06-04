@@ -49,3 +49,26 @@ export async function listWallets(): Promise<WalletListResponse['wallets']> {
   const response = await client.get<WalletListResponse>('/api/v1/wallets');
   return response.data.wallets;
 }
+
+export async function postRecurringExpense(expenseId: string, date?: string): Promise<Expense> {
+  const response = await client.post<Expense>('/api/v1/expenses/recurring/post', {
+    expense_id: expenseId,
+    date,
+  });
+  return response.data;
+}
+
+export async function uploadReceipt(expenseId: string, file: File): Promise<{ receipt_url: string; file_size: number }> {
+  const formData = new FormData();
+  formData.append('receipt', file);
+  const response = await client.post<{ receipt_url: string; file_size: number }>(
+    `/api/v1/expenses/${expenseId}/receipt`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  return response.data;
+}

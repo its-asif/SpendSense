@@ -11,7 +11,7 @@ import { listCurrencies } from '../../api/currencies';
 type ExpenseFormProps = {
   categories: ExpenseCategory[];
   wallets: Wallet[];
-  onSubmit: (data: CreateExpenseRequest) => Promise<void>;
+  onSubmit: (data: CreateExpenseRequest, file: File | null) => Promise<void>;
   initialExpense?: Expense | null;
   onCancel?: () => void;
 };
@@ -37,6 +37,36 @@ export function ExpenseForm({ categories, wallets, onSubmit, initialExpense, onC
   const [notes, setNotes] = useState(initialExpense?.notes ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Drag and drop receipt uploader state
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setIsDragActive(true);
+    } else if (e.type === "dragleave") {
+      setIsDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setReceiptFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setReceiptFile(e.target.files[0]);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -95,9 +125,9 @@ export function ExpenseForm({ categories, wallets, onSubmit, initialExpense, onC
             date,
             notes: notes || undefined,
             fx_rate_to_base: 1,
-            is_recurring: initialExpense?.is_recurring ?? false,
-            recurring_rule: initialExpense?.recurring_rule ?? undefined,
-          });
+            is_recurring: false,
+            recurring_rule: undefined,
+          }, receiptFile);
 
           if (!initialExpense) {
             setAmount('');
@@ -105,11 +135,12 @@ export function ExpenseForm({ categories, wallets, onSubmit, initialExpense, onC
             setNotes('');
             setWalletId('');
             setCategoryId('');
+            setReceiptFile(null);
             setCurrency(currencyOptions[0]?.code ?? settings.defaultCurrency);
             setDate(new Date().toISOString().slice(0, 10));
           }
-        } catch {
-          setError('Failed to save expense. Check the backend and required fields.');
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save expense. Check the backend and required fields.');
         } finally {
           setIsSaving(false);
         }
@@ -124,6 +155,7 @@ export function ExpenseForm({ categories, wallets, onSubmit, initialExpense, onC
         <Input label="Merchant" value={merchant} onChange={(event) => setMerchant(event.target.value)} placeholder="Coffee shop" />
       </div>
 
+
       <label className="block">
         <span className="mb-1.5 block text-xs font-semibold text-text-secondary">Notes</span>
         <textarea
@@ -133,6 +165,60 @@ export function ExpenseForm({ categories, wallets, onSubmit, initialExpense, onC
           placeholder="Optional details"
         />
       </label>
+
+      {/* Drag & Drop Receipt Attachment */}
+      <div className="block">
+        <span className="mb-1.5 block text-xs font-semibold text-text-secondary">Receipt Attachment (Optional)</span>
+        <div
+          onDragEnter={handleDrag}
+          onDragOver={handleDrag}
+          onDragLeave={handleDrag}
+          onDrop={handleDrop}
+          className={`relative border border-dashed rounded-xl p-4 flex flex-col items-center justify-center transition-all cursor-pointer ${
+            isDragActive ? 'border-accent-blue bg-accent-blue/10' : 'border-dark-elevated hover:border-text-muted bg-dark-bg/30'
+          }`}
+          onClick={() => document.getElementById('receipt-input')?.click()}
+        >
+          <input
+            id="receipt-input"
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <div className="text-center space-y-1 py-1">
+            <span className="text-xl">📄</span>
+            {receiptFile ? (
+              <div>
+                <p className="text-sm font-semibold text-text-primary">{receiptFile.name}</p>
+                <p className="text-xs text-text-muted">{(receiptFile.size / 1024).toFixed(1)} KB</p>
+              </div>
+            ) : initialExpense?.receipt_url ? (
+              <div>
+                <p className="text-sm font-semibold text-accent-green">✓ Receipt already attached</p>
+                <p className="text-xs text-text-muted">Click or drag a new file to overwrite</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm font-medium text-text-primary">Drag & drop receipt here, or <span className="text-accent-blue font-semibold">browse</span></p>
+                <p className="text-xs text-text-muted">Supports images and PDF (Max 5MB)</p>
+              </div>
+            )}
+          </div>
+          {receiptFile && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setReceiptFile(null);
+              }}
+              className="absolute top-2 right-2 text-xs bg-dark-elevated text-text-primary h-5 w-5 rounded-full flex items-center justify-center hover:bg-destructive hover:text-white"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
 
       {error && <p className="text-sm text-accent-red">{error}</p>}
 

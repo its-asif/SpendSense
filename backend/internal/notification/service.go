@@ -2,7 +2,6 @@ package notification
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -160,57 +159,71 @@ func budgetAlertCopy(threshold int, categoryName string, usagePercent int, spent
 func (s *Service) checkRecurringExpenseReminders(ctx context.Context, userID uuid.UUID) error {
 	now := s.now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	dayKey := today.Format("2006-01-02")
 
 	rows, err := s.db.Query(ctx, `
-		SELECT id, merchant, amount, currency, date, recurring_rule
-		FROM expenses
-		WHERE user_id = $1
-			AND is_deleted = FALSE
-			AND is_recurring = TRUE
-			AND EXTRACT(DAY FROM date) = EXTRACT(DAY FROM $2::date)
-	`, userID, today)
+		SELECT id, title, amount, currency, start_date, deadline, alert_rule, interval
+		FROM recurring_payments
+		WHERE user_id = $1 AND status = 'unpaid'
+	`, userID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var expenseID uuid.UUID
-		var merchant sql.NullString
+		var rpID uuid.UUID
+		var title, currency, alertRule, interval string
 		var amount float64
-		var currency string
-		var expenseDate time.Time
-		var recurringRule sql.NullString
-		if err := rows.Scan(&expenseID, &merchant, &amount, &currency, &expenseDate, &recurringRule); err != nil {
+		var startDate, deadline time.Time
+		if err := rows.Scan(&rpID, &title, &amount, &currency, &startDate, &deadline, &alertRule, &interval); err != nil {
 			return err
 		}
 
-		dedupeKey := fmt.Sprintf("recurring:%s:%s", expenseID.String(), dayKey)
-		exists, err := s.notificationExistsToday(ctx, userID, TypeRecurringDue, dedupeKey)
-		if err != nil || exists {
+		// Determine if this should trigger an alert
+		var triggerAlert bool
+		if alertRule == "start" {
+			triggerAlert = !today.Before(startDate)
+		} else if strings.HasSuffix(alertRule, "d") {
+			var days int
+			if _, err := fmt.Sscanf(alertRule, "%dd", &days); err == nil {
+				triggerAlert = !today.Before(deadline.AddDate(0, 0, -days))
+			} else {
+				triggerAlert = !today.Before(startDate)
+			}
+		} else {
+			triggerAlert = !today.Before(startDate)
+		}
+
+		if !triggerAlert {
 			continue
 		}
 
-		label := "Recurring expense"
-		if merchant.Valid && strings.TrimSpace(merchant.String) != "" {
-			label = merchant.String
-		}
-		rule := "monthly"
-		if recurringRule.Valid && strings.TrimSpace(recurringRule.String) != "" {
-			rule = recurringRule.String
+		dedupeKey := fmt.Sprintf("rp:%s:%s", rpID.String(), deadline.Format("2006-01-02"))
+
+		// Check if we already sent notification for this cycle
+		var marker int
+		errExists := s.db.QueryRow(ctx, `
+			SELECT 1 FROM notifications
+			WHERE user_id = $1 AND type = $2 AND metadata->>'dedupe_key' = $3
+			LIMIT 1
+		`, userID, TypeRecurringDue, dedupeKey).Scan(&marker)
+
+		if errExists == nil {
+			// Already notified
+			continue
 		}
 
 		metadata, _ := json.Marshal(map[string]any{
-			"expense_id": expenseID.String(),
-			"dedupe_key": dedupeKey,
+			"recurring_payment_id": rpID.String(),
+			"dedupe_key":           dedupeKey,
 		})
+
 		n := &Notification{
-			ID:     uuid.New(),
-			UserID: userID,
-			Type:   TypeRecurringDue,
-			Title:  "Recurring expense due",
-			Body:   fmt.Sprintf("%s (%s) is due today — about %.2f %s on a %s schedule.", label, expenseDate.Format("Jan 2"), amount, currency, rule),
+			ID:       uuid.New(),
+			UserID:   userID,
+			Type:     TypeRecurringDue,
+			Title:    "Recurring payment due: " + title,
+			Body:     fmt.Sprintf("Payment for %s of %.2f %s is due by %s.", title, amount, currency, deadline.Format("Jan 02, 2006")),
 			Metadata: metadata,
 		}
 		if err := s.repo.Create(ctx, n); err != nil {

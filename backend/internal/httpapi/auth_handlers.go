@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -204,6 +205,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/docs", s.handleSwaggerUI)
 	s.mux.HandleFunc("/api/v1/currencies", s.handleCurrencyList)
 	s.mux.HandleFunc("/api/v1/currencies/convert", s.handleCurrencyConvert)
+	_ = os.MkdirAll("./assets/receipts", 0755)
+	s.mux.Handle("/assets/receipts/", http.StripPrefix("/assets/receipts/", http.FileServer(http.Dir("./assets/receipts"))))
 	s.registerDashboardRoutes()
 	s.mux.HandleFunc("/auth/register", s.handleRegister)
 	s.mux.HandleFunc("/auth/login", s.handleLogin)
@@ -227,6 +230,7 @@ func (s *Server) routes() {
 	s.registerCategoryRoutes()
 	s.registerBudgetRoutes()
 	s.registerNotificationRoutes()
+	s.registerRecurringPaymentRoutes()
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {

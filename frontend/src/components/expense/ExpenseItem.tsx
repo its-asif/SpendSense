@@ -23,9 +23,21 @@ export function ExpenseItem({ expense, categories, wallets, onEdit, onRequestDel
   return (
     <div className="flex items-center justify-between gap-4 border-b border-dark-elevated py-3 last:border-b-0">
       <div className="min-w-0">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Badge variant="expense">{category?.name ?? 'Uncategorized'}</Badge>
           <p className="truncate font-semibold text-text-primary">{expense.merchant || 'Unnamed expense'}</p>
+          {expense.receipt_url && (
+            <a
+              href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}${expense.receipt_url}`}
+              target="_blank"
+              rel="noreferrer"
+              title="View Receipt"
+              className="text-accent-blue hover:underline text-xs inline-flex items-center gap-1 font-semibold border border-dark-elevated bg-dark-bg/50 px-2 py-0.5 rounded-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              📎 Receipt
+            </a>
+          )}
         </div>
         <p className="mt-1 text-xs text-text-muted">
           {expense.date} · {wallet?.name ?? 'Unknown wallet'}

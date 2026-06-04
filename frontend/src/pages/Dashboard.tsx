@@ -8,7 +8,7 @@ import { TransactionHistoryCard } from '../components/dashboard/TransactionHisto
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { ExpenseForm } from '../components/expense/ExpenseForm';
-import { createExpense, deleteExpense, listExpenses, updateExpense } from '../api/expenses';
+import { createExpense, deleteExpense, listExpenses, updateExpense, uploadReceipt } from '../api/expenses';
 import { createIncome, deleteIncome, listIncomes, updateIncome } from '../api/incomes';
 import { useEffect, useState } from 'react';
 import Modal from '../components/common/Modal';
@@ -35,6 +35,17 @@ import { IncomeForm } from '../components/income/IncomeForm';
 import { useDashboardMeta } from '../hooks/useDashboardMeta';
 import { useUserSettings } from '../hooks/useUserSettings';
 import { formatCurrency } from '../lib/userSettings';
+
+function parseLocalDate(dateStr: string): Date {
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  return new Date(dateStr);
+}
 
 type DashboardProps = {
   user: AuthUser;
@@ -230,6 +241,17 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       cancelled = true;
     };
   }, [transferFromWallet]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  useEffect(() => {
+    const handleRefresh = () => {
+      setRefreshTrigger((prev) => prev + 1);
+    };
+    window.addEventListener('spendsense-refresh-dashboard', handleRefresh);
+    return () => {
+      window.removeEventListener('spendsense-refresh-dashboard', handleRefresh);
+    };
+  }, []);
+
   const {
     categories,
     incomeCategories,
@@ -287,7 +309,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTrigger]);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,7 +338,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     return () => {
       cancelled = true;
     };
-  }, [settings.defaultCurrency]);
+  }, [settings.defaultCurrency, refreshTrigger]);
 
   const refreshWidgets = async () => {
     setWidgetsError(null);
@@ -333,7 +355,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
   useEffect(() => {
     void refreshWidgets();
-  }, [settings.defaultCurrency]);
+  }, [settings.defaultCurrency, refreshTrigger]);
 
   useEffect(() => {
     let cancelled = false;
@@ -369,7 +391,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       }
 
       for (const expense of expenses) {
-        const itemDate = new Date(expense.date);
+        const itemDate = parseLocalDate(expense.date);
         if (Number.isNaN(itemDate.getTime())) {
           continue;
         }
@@ -384,7 +406,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       }
 
       for (const income of incomes) {
-        const itemDate = new Date(income.income_date);
+        const itemDate = parseLocalDate(income.income_date);
         if (Number.isNaN(itemDate.getTime())) {
           continue;
         }
@@ -447,7 +469,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       const walletById = new Map(wallets.map((wallet) => [wallet.id, wallet]));
 
       for (const expense of expenses) {
-        const itemDate = new Date(expense.date);
+        const itemDate = parseLocalDate(expense.date);
         if (Number.isNaN(itemDate.getTime())) {
           continue;
         }
@@ -517,7 +539,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       const bucketByKey = new Map(monthBuckets.map((item) => [item.key, item]));
 
       for (const expense of expenses) {
-        const itemDate = new Date(expense.date);
+        const itemDate = parseLocalDate(expense.date);
         if (Number.isNaN(itemDate.getTime())) {
           continue;
         }
@@ -532,7 +554,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       }
 
       for (const income of incomes) {
-        const itemDate = new Date(income.income_date);
+        const itemDate = parseLocalDate(income.income_date);
         if (Number.isNaN(itemDate.getTime())) {
           continue;
         }
@@ -654,8 +676,16 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     );
   };
 
-  const handleCreateExpense = async (data: CreateExpenseRequest) => {
+  const handleCreateExpense = async (data: CreateExpenseRequest, file: File | null) => {
     const created = await createExpense(data);
+    if (file) {
+      try {
+        const enriched = await uploadReceipt(created.id, file);
+        created.receipt_url = enriched.receipt_url;
+      } catch (err) {
+        toast.error('Expense created but receipt upload failed');
+      }
+    }
     setExpenses((current) => [created, ...current]);
     setEditingExpense(null);
     setManageExpensesOpen(false);
@@ -666,12 +696,20 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     toast.success('Expense created');
   };
 
-  const handleUpdateExpense = async (data: CreateExpenseRequest) => {
+  const handleUpdateExpense = async (data: CreateExpenseRequest, file: File | null) => {
     if (!editingExpense) {
       return;
     }
 
     const updated = await updateExpense(editingExpense.id, data);
+    if (file) {
+      try {
+        const enriched = await uploadReceipt(updated.id, file);
+        updated.receipt_url = enriched.receipt_url;
+      } catch (err) {
+        toast.error('Expense updated but receipt upload failed');
+      }
+    }
     setExpenses((current) => current.map((expense) => (expense.id === updated.id ? updated : expense)));
     setEditingExpense(null);
     void syncDashboardWallets();
@@ -928,7 +966,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   }));
   const allTransactionHistoryRows = [
     ...expenses.map((expense) => {
-      const date = new Date(expense.date);
+      const date = parseLocalDate(expense.date);
       const category = categoryMetaByID.get(expense.category_id);
 
       return {
@@ -948,10 +986,13 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             ? 'Due' as const
             : 'Paid' as const,
         sortDate: date.getTime(),
+        receipt_url: expense.receipt_url,
+        is_recurring: expense.is_recurring,
+        recurring_rule: expense.recurring_rule,
       };
     }),
     ...incomes.map((income) => {
-      const date = new Date(income.income_date);
+      const date = parseLocalDate(income.income_date);
       const category = income.category_id ? categoryMetaByID.get(income.category_id) : undefined;
 
       return {
@@ -967,6 +1008,9 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         type: 'income' as const,
         status: 'Paid' as const,
         sortDate: date.getTime(),
+        receipt_url: undefined,
+        is_recurring: false,
+        recurring_rule: undefined,
       };
     }),
   ]
@@ -1556,7 +1600,22 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                             </div>
                           </td>
                           <td className="px-4 py-4 text-text-muted">{transaction.dateLabel}</td>
-                          <td className="px-4 py-4 text-text-secondary">{transaction.description}</td>
+                          <td className="px-4 py-4 text-text-secondary">
+                            <div className="flex items-center gap-2">
+                              <span>{transaction.description}</span>
+                              {transaction.receipt_url && (
+                                <a
+                                  href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}${transaction.receipt_url}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="View/Download Receipt"
+                                  className="text-accent-blue hover:text-accent-blue/80 font-medium text-xs bg-dark-elevated px-1.5 py-0.5 rounded"
+                                >
+                                  📎 Receipt
+                                </a>
+                              )}
+                            </div>
+                          </td>
                           <td className={`px-4 py-4 text-right font-mono font-semibold ${amountClass}`}>
                             {transaction.type === 'income' ? '+' : '-'}
                             {formatCurrency(transaction.amount, transaction.currency, settings.locale)}

@@ -8,7 +8,7 @@ import { Input } from '../components/common/Input';
 import Modal from '../components/common/Modal';
 import { ExpenseForm } from '../components/expense/ExpenseForm';
 import { ExpenseList } from '../components/expense/ExpenseList';
-import { createExpense, deleteExpense, listExpenses, updateExpense } from '../api/expenses';
+import { createExpense, deleteExpense, listExpenses, updateExpense, uploadReceipt } from '../api/expenses';
 import { useDashboardMeta } from '../hooks/useDashboardMeta';
 import type { AuthUser, CreateExpenseRequest, Expense } from '../types';
 
@@ -66,8 +66,16 @@ export function ExpensesPage({ user, onLogout }: ExpensesPageProps) {
     void refreshExpenses();
   }, []);
 
-  const handleCreateExpense = async (data: CreateExpenseRequest) => {
+  const handleCreateExpense = async (data: CreateExpenseRequest, file: File | null) => {
     const created = await createExpense(data);
+    if (file) {
+      try {
+        const enriched = await uploadReceipt(created.id, file);
+        created.receipt_url = enriched.receipt_url;
+      } catch (err) {
+        toast.error('Expense created but receipt upload failed');
+      }
+    }
     setExpenses((current) => [created, ...current]);
     setCurrentPage(1);
     void syncWallets();
@@ -75,12 +83,20 @@ export function ExpensesPage({ user, onLogout }: ExpensesPageProps) {
     toast.success('Expense created');
   };
 
-  const handleUpdateExpense = async (data: CreateExpenseRequest) => {
+  const handleUpdateExpense = async (data: CreateExpenseRequest, file: File | null) => {
     if (!editingExpense) {
       return;
     }
 
     const updated = await updateExpense(editingExpense.id, data);
+    if (file) {
+      try {
+        const enriched = await uploadReceipt(updated.id, file);
+        updated.receipt_url = enriched.receipt_url;
+      } catch (err) {
+        toast.error('Expense updated but receipt upload failed');
+      }
+    }
     setExpenses((current) => current.map((expense) => (expense.id === updated.id ? updated : expense)));
     setEditingExpense(null);
     void syncWallets();

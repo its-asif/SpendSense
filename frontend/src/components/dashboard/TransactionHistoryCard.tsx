@@ -13,6 +13,9 @@ type TransactionHistoryItem = {
   currency: string;
   type: 'income' | 'expense';
   status?: 'Paid' | 'Due' | 'Cancel';
+  receipt_url?: string | null;
+  is_recurring?: boolean;
+  recurring_rule?: string | null;
 };
 
 type TransactionHistoryCardProps = {
@@ -73,7 +76,22 @@ export function TransactionHistoryCard({ transactions, onSeeMore, className }: T
                         </div>
                       </td>
                       <td className="px-4 py-4 text-text-muted">{transaction.dateLabel}</td>
-                      <td className="px-4 py-4 text-text-secondary">{transaction.description}</td>
+                      <td className="px-4 py-4 text-text-secondary">
+                        <div className="flex items-center gap-2">
+                          <span>{transaction.description}</span>
+                          {transaction.receipt_url && (
+                            <a
+                              href={`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}${transaction.receipt_url}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="View/Download Receipt"
+                              className="text-accent-blue hover:text-accent-blue/80 font-medium text-xs bg-dark-elevated px-1.5 py-0.5 rounded"
+                            >
+                              📎 Receipt
+                            </a>
+                          )}
+                        </div>
+                      </td>
                       <td className={`px-4 py-4 text-right font-mono font-semibold ${amountClass}`}>
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount, transaction.currency, settings.locale)}
                       </td>
