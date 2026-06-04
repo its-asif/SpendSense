@@ -143,9 +143,15 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
             .finally(() => {
               if (!cancelled) setIsLoadingSessions(false);
             });
-        // fetch current user to get 2FA status
+        // fetch current user to get 2FA status and profile details
         void me().then((m) => {
-          if (!cancelled) setIs2FAEnabled(!!m.totp_enabled);
+          if (!cancelled) {
+            setIs2FAEnabled(!!m.totp_enabled);
+            setProfile({
+              displayName: m.display_name?.trim() || m.email.split('@')[0] || m.email || user.name,
+              avatarUrl: m.avatar_url || '',
+            });
+          }
         }).catch(() => {});
         }
       }
@@ -189,6 +195,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
             name: updatedUser.display_name?.trim() || session.user.name,
             email: updatedUser.email,
             baseCurrency: updatedUser.base_currency,
+            avatarUrl: updatedUser.avatar_url || session.user.avatarUrl,
           },
         });
       }
@@ -221,6 +228,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
             name: nextDisplayName,
             email: updatedUser.email,
             baseCurrency: updatedUser.base_currency,
+            avatarUrl: updatedUser.avatar_url || undefined,
           },
         });
       }
@@ -267,6 +275,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
       setNewPassword('');
       setConfirmPassword('');
       toast.success('Password changed');
+      setIsPasswordModalOpen(false);
     } catch (err) {
       toast.error('Failed to change password');
     } finally {
@@ -345,9 +354,17 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
               <div className="space-y-4 sm:space-y-6 lg:col-span-2">
                 <Card>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                    <div className="mx-auto flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-full bg-dark-elevated text-2xl font-bold text-text-primary sm:mx-0">
-                      {getInitials(user.name)}
-                    </div>
+                    {user.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.name}
+                        className="mx-auto h-[80px] w-[80px] shrink-0 rounded-full object-cover sm:mx-0"
+                      />
+                    ) : (
+                      <div className="mx-auto flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-full bg-dark-elevated text-2xl font-bold text-text-primary sm:mx-0">
+                        {getInitials(user.name)}
+                      </div>
+                    )}
                     <div className="flex-1 space-y-3 text-center sm:space-y-4 sm:text-left">
                       <div>
                         <h2 className="text-lg sm:text-xl font-bold text-foreground">Welcome, {user.name}!</h2>
@@ -356,8 +373,8 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
                         </p>
                       </div>
                       <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
-                        <Button type="button" onClick={() => handleChangeTab('general')}>
-                          Verify account
+                        <Button type="button" onClick={() => handleChangeTab('profile')}>
+                          Edit profile
                         </Button>
                         <Button type="button" variant="secondary" onClick={() => handleChangeTab('security')}>
                           Two-factor authentication (2FA)
@@ -396,12 +413,12 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
               </div>
 
               <div className="space-y-4 sm:space-y-6">
-                <Card title="Verify & Upgrade">
+                <Card title="Account Status">
                   <div className="space-y-3 sm:space-y-4">
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium">Account Status :</span>
+                      <span className="font-medium">Status:</span>
                       <span className={wallets.length ? 'text-accent-green' : 'text-accent-amber'}>
-                        {wallets.length ? 'Active' : 'Pending'}
+                        {wallets.length ? 'Active' : 'Setup Required'}
                       </span>
                     </div>
                     <p className="text-xs sm:text-sm text-text-muted">
@@ -409,9 +426,15 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
                         ? 'You already have connected wallets and can review balances, transfers, and preferences.'
                         : 'Add at least one wallet to unlock the full account overview and transaction tracking.'}
                     </p>
-                    <Button type="button" className="w-full" onClick={() => handleChangeTab('security')}>
-                      Open security
-                    </Button>
+                    {wallets.length === 0 ? (
+                      <Button type="button" className="w-full" onClick={() => navigate('/wallets')}>
+                        Add Wallet
+                      </Button>
+                    ) : (
+                      <Button type="button" className="w-full" onClick={() => handleChangeTab('security')}>
+                        Manage Security
+                      </Button>
+                    )}
                   </div>
                 </Card>
 
@@ -499,9 +522,17 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
             <div className="grid gap-4 lg:grid-cols-3">
               <Card title="Profile" subtitle="View the current account profile" className="lg:col-span-2">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="mx-auto flex h-[96px] w-[96px] shrink-0 items-center justify-center rounded-full bg-dark-elevated text-3xl font-bold text-text-primary sm:mx-0">
-                    {getInitials(user.name)}
-                  </div>
+                    {user.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.name}
+                        className="mx-auto h-[96px] w-[96px] shrink-0 rounded-full object-cover sm:mx-0"
+                      />
+                    ) : (
+                      <div className="mx-auto flex h-[96px] w-[96px] shrink-0 items-center justify-center rounded-full bg-dark-elevated text-3xl font-bold text-text-primary sm:mx-0">
+                        {getInitials(user.name)}
+                      </div>
+                    )}
                   <div className="space-y-3 text-center sm:text-left">
                     <div>
                       <h2 className="text-xl font-bold tracking-tight text-foreground">{user.name}</h2>
@@ -680,7 +711,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
       </main>
         {isPasswordModalOpen && (
           <Modal title="Change password" onClose={() => setIsPasswordModalOpen(false)}>
-            <form className="space-y-3" onSubmit={(e) => { void handleChangePassword(e); setIsPasswordModalOpen(false); }}>
+            <form className="space-y-3" onSubmit={handleChangePassword}>
               <Input
                 label="Current password"
                 type="password"

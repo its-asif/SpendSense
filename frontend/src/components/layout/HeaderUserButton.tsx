@@ -21,9 +21,13 @@ export function HeaderUserButton({ user }: HeaderUserButtonProps) {
       aria-label={user.name}
     >
       <span className="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full border border-dark-elevated bg-dark-bg">
-        <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-text-primary">
-          {getInitials(user.name)}
-        </span>
+        {user.avatarUrl ? (
+          <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-text-primary">
+            {getInitials(user.name)}
+          </span>
+        )}
       </span>
     </button>
   );

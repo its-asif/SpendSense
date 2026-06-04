@@ -150,9 +150,8 @@ export function RecurringPaymentList({
                   <div className="flex items-center justify-end gap-2">
                     {!hasEnded && (
                       <Button
-                        size="sm"
                         onClick={() => onPay(payment)}
-                        className="bg-accent-blue hover:bg-accent-blue/90"
+                        className="py-1.5 px-3 text-xs bg-accent-blue hover:bg-accent-blue/90"
                       >
                         Pay
                       </Button>

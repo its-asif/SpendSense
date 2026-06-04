@@ -72,10 +72,12 @@ type tokenResponse struct {
 }
 
 type currentUserResponse struct {
-	UserID      string `json:"user_id"`
-	Email       string `json:"email"`
-	SessionID   string `json:"session_id"`
-	TOTPEnabled bool   `json:"totp_enabled"`
+	UserID      string  `json:"user_id"`
+	Email       string  `json:"email"`
+	SessionID   string  `json:"session_id"`
+	TOTPEnabled bool    `json:"totp_enabled"`
+	DisplayName *string `json:"display_name,omitempty"`
+	AvatarURL   *string `json:"avatar_url,omitempty"`
 }
 
 type updateUserPreferencesRequest struct {
@@ -392,6 +394,8 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		Email:       email,
 		SessionID:   sessionID.String(),
 		TOTPEnabled: user.TOTPEnabled,
+		DisplayName: user.DisplayName,
+		AvatarURL:   user.AvatarURL,
 	})
 }
 

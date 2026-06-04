@@ -15,11 +15,12 @@ function toDisplayName(email: string, displayName?: string | null) {
   return localPart ? localPart.replace(/[._-]+/g, ' ') : email;
 }
 
-export function toAuthUser(email: string, displayName?: string | null, baseCurrency = 'USD'): AuthUser {
+export function toAuthUser(email: string, displayName?: string | null, baseCurrency = 'USD', avatarUrl?: string | null): AuthUser {
   return {
     name: toDisplayName(email, displayName),
     email,
     baseCurrency: baseCurrency.trim().toUpperCase() || 'USD',
+    avatarUrl: avatarUrl || undefined,
   };
 }
 
@@ -49,6 +50,7 @@ export function readSession(): AuthSession | null {
           name: session.user.name,
           email: session.user.email,
           baseCurrency: typeof session.user.baseCurrency === 'string' && session.user.baseCurrency.trim() ? session.user.baseCurrency.trim().toUpperCase() : 'USD',
+          avatarUrl: typeof session.user.avatarUrl === 'string' && session.user.avatarUrl.trim() ? session.user.avatarUrl.trim() : undefined,
         },
       };
     }

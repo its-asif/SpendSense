@@ -6,7 +6,12 @@ function toAuthSession(response: ApiAuthResponse): AuthSession {
   return {
     accessToken: response.access_token,
     refreshToken: response.refresh_token,
-    user: toAuthUser(response.user.email, response.user.display_name ?? undefined, response.user.base_currency),
+    user: toAuthUser(
+      response.user.email,
+      response.user.display_name ?? undefined,
+      response.user.base_currency,
+      response.user.avatar_url ?? undefined
+    ),
   };
 }
 
@@ -86,7 +91,14 @@ export async function updateUserPreferences(data: UpdateUserPreferencesRequest):
   return response.data;
 }
 
-export async function me(): Promise<{ user_id: string; email: string; session_id: string; totp_enabled: boolean }> {
+export async function me(): Promise<{
+  user_id: string;
+  email: string;
+  session_id: string;
+  totp_enabled: boolean;
+  display_name?: string | null;
+  avatar_url?: string | null;
+}> {
   const response = await client.get('/auth/me');
   return response.data;
 }

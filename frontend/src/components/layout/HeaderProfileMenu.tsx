@@ -53,12 +53,16 @@ export function HeaderProfileMenu({ user, onLogout }: HeaderProfileMenuProps) {
         className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-transparent p-0 transition-colors hover:bg-transparent"
       >
         <span className="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full border border-dark-elevated bg-dark-bg">
-          <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-text-primary">
-            {getInitials(user.name)}
-          </span>
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-text-primary">
+              {getInitials(user.name)}
+            </span>
+          )}
         </span>
       </button>
-
+ 
       {open && (
         <div
           role="menu"
@@ -67,9 +71,13 @@ export function HeaderProfileMenu({ user, onLogout }: HeaderProfileMenuProps) {
         >
           <div className="flex items-center gap-3 p-3">
             <span className="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-full bg-dark-elevated">
-              <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-text-primary">
-                {getInitials(user.name)}
-              </span>
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-text-primary">
+                  {getInitials(user.name)}
+                </span>
+              )}
             </span>
             <div className="flex min-w-0 flex-col">
               <p className="truncate text-sm font-medium text-text-primary">{user.name}</p>

@@ -2,6 +2,7 @@ export type AuthUser = {
   name: string;
   email: string;
   baseCurrency: string;
+  avatarUrl?: string;
 };
 
 export type ApiUser = {
