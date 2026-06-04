@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { ExpensesPage } from './pages/ExpensesPage';
 import { IncomesPage } from './pages/IncomesPage';
@@ -10,12 +10,22 @@ import { ReportsPage } from './pages/ReportsPage';
 import { RecurringPage } from './pages/RecurringPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { Login } from './pages/Login';
-import { clearSession, readSession } from './lib/storage';
+import { clearSession, readSession, SESSION_EVENT } from './lib/storage';
 import { logout } from './api/auth';
 import type { AuthSession } from './types';
 
 export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() => readSession());
+
+  useEffect(() => {
+    const handleSessionChange = () => {
+      setSession(readSession());
+    };
+    window.addEventListener(SESSION_EVENT, handleSessionChange);
+    return () => {
+      window.removeEventListener(SESSION_EVENT, handleSessionChange);
+    };
+  }, []);
 
   const handleLogout = async () => {
     if (session?.refreshToken) {

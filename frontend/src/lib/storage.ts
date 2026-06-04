@@ -61,12 +61,16 @@ export function readSession(): AuthSession | null {
   return null;
 }
 
+export const SESSION_EVENT = 'spendsense-session-changed';
+
 export function saveSession(session: AuthSession) {
   window.localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
 export function clearSession() {
   window.localStorage.removeItem(AUTH_KEY);
+  window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
 export function readUser(): AuthUser | null {

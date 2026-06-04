@@ -292,7 +292,7 @@ export function RecurringPaymentForm({
           <select
             value={interval}
             onChange={(e) => setInterval(e.target.value)}
-            className="select"
+            className="input"
             disabled={isSaving}
           >
             <option value="daily">Daily</option>
@@ -310,7 +310,7 @@ export function RecurringPaymentForm({
               <select
                 value={startWeeklyDay}
                 onChange={(e) => setStartWeeklyDay(e.target.value)}
-                className="select"
+                className="input"
                 disabled={isSaving}
               >
                 {WEEKDAYS.map((d) => (
@@ -323,7 +323,7 @@ export function RecurringPaymentForm({
               <select
                 value={deadlineWeeklyDay}
                 onChange={(e) => setDeadlineWeeklyDay(e.target.value)}
-                className="select"
+                className="input"
                 disabled={isSaving}
               >
                 {WEEKDAYS.map((d) => (
@@ -342,7 +342,7 @@ export function RecurringPaymentForm({
               <select
                 value={startMonthlyDay}
                 onChange={(e) => setStartMonthlyDay(e.target.value)}
-                className="select"
+                className="input"
                 disabled={isSaving}
               >
                 {daysOption.map((d) => (
@@ -355,7 +355,7 @@ export function RecurringPaymentForm({
               <select
                 value={deadlineMonthlyDay}
                 onChange={(e) => setDeadlineMonthlyDay(e.target.value)}
-                className="select"
+                className="input"
                 disabled={isSaving}
               >
                 {daysOption.map((d) => (
@@ -375,7 +375,7 @@ export function RecurringPaymentForm({
                 <select
                   value={startYearlyMonth}
                   onChange={(e) => setStartYearlyMonth(e.target.value)}
-                  className="select"
+                  className="input"
                   disabled={isSaving}
                 >
                   {MONTHS.map((m) => (
@@ -388,7 +388,7 @@ export function RecurringPaymentForm({
                 <select
                   value={startYearlyDay}
                   onChange={(e) => setStartYearlyDay(e.target.value)}
-                  className="select"
+                  className="input"
                   disabled={isSaving}
                 >
                   {daysOption.map((d) => (
@@ -403,7 +403,7 @@ export function RecurringPaymentForm({
                 <select
                   value={deadlineYearlyMonth}
                   onChange={(e) => setDeadlineYearlyMonth(e.target.value)}
-                  className="select"
+                  className="input"
                   disabled={isSaving}
                 >
                   {MONTHS.map((m) => (
@@ -416,7 +416,7 @@ export function RecurringPaymentForm({
                 <select
                   value={deadlineYearlyDay}
                   onChange={(e) => setDeadlineYearlyDay(e.target.value)}
-                  className="select"
+                  className="input"
                   disabled={isSaving}
                 >
                   {daysOption.map((d) => (
@@ -433,7 +433,7 @@ export function RecurringPaymentForm({
           <select
             value={alertSelection}
             onChange={(e) => setAlertSelection(e.target.value)}
-            className="select"
+            className="input"
             disabled={isSaving}
           >
             <option value="start">When start date arrives</option>
@@ -461,7 +461,7 @@ export function RecurringPaymentForm({
           <select
             value={endType}
             onChange={(e) => setEndType(e.target.value as any)}
-            className="select"
+            className="input"
             disabled={isSaving}
           >
             <option value="never">Never Ends (Continuous)</option>
