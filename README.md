@@ -2,9 +2,6 @@
 
 A personal finance tracker for a single user — track expenses, incomes, budgets, wallets, and recurring payments with a full REST API, a React web app, and an optional CLI.
 
-> **This document reflects what is fully implemented and runnable today.** Roadmap items are clearly marked.
-
----
 
 ## Table of Contents
 
@@ -19,7 +16,6 @@ A personal finance tracker for a single user — track expenses, incomes, budget
 - [Database](#database)
 - [Environment Variables](#environment-variables)
 - [Makefile Targets](#makefile-targets)
-- [Roadmap](#roadmap)
 
 ---
 
@@ -422,28 +418,3 @@ migrate create -ext sql -dir backend/migrations -seq <descriptive_name>
 | `make cli-build` | `go build` | Build `bin/spendsense` from `cli/` |
 | `make cli-run` | cli-build + `--help` | Build CLI and print help |
 
----
-
-## Roadmap
-
-Items below are **not yet implemented** and represent planned future work.
-
-### Near-term
-
-- [ ] **Tags** — Schema exists (`tags` table in migration 003); service and HTTP routes pending.
-- [ ] **Personal Loans** — Schema exists (`personal_loans` in migration 004); business logic pending.
-- [ ] **`testcontainers-go`** — Run integration tests against a fresh ephemeral Postgres container in CI without a separate Docker service.
-- [ ] **Audit log** — `internal/audit` package exists; event-recording hooks not yet wired to handlers.
-
-### Medium-term
-
-- [ ] **Multi-currency reporting** — Aggregate expenses across wallets by converting to a user-defined base currency.
-- [ ] **Budget alerts** — Push notification when a budget reaches a configurable threshold (e.g. 80%).
-- [ ] **CSV / PDF export** — Export expense and income history.
-- [ ] **Recurring payment reminders** — Notify before upcoming recurring payment deadlines.
-
-### Longer-term
-
-- [ ] **Mobile app** — React Native client reusing the same REST API.
-- [ ] **OpenID Connect login** — Google / GitHub OAuth2 as an alternative to password auth.
-- [ ] **Shared expenses** — Optional multi-user mode for splitting costs between accounts.
