@@ -9,9 +9,17 @@ import (
 	"github.com/google/uuid"
 )
 
-type Service struct{ repo *Repository }
+type Store interface {
+	CreateCategory(ctx context.Context, userID uuid.UUID, c *Category) error
+	GetCategoryByID(ctx context.Context, id uuid.UUID, userID *uuid.UUID, kind string) (*Category, error)
+	ListCategories(ctx context.Context, userID uuid.UUID, kind string) ([]*Category, error)
+	UpdateCategory(ctx context.Context, userID uuid.UUID, c *Category) error
+	DeleteCategory(ctx context.Context, userID, id uuid.UUID) error
+}
 
-func NewService(r *Repository) *Service { return &Service{repo: r} }
+type Service struct{ repo Store }
+
+func NewService(r Store) *Service { return &Service{repo: r} }
 
 func (s *Service) CreateCategory(ctx context.Context, userID uuid.UUID, req CreateRequest) (*Category, error) {
 	if strings.TrimSpace(req.Name) == "" {

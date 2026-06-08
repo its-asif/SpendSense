@@ -9,21 +9,27 @@ import (
 	"strings"
 	"time"
 
-	"spendsense-backend/internal/infra"
+	"spendsense-backend/internal/domain"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
+
+type DatabaseReader interface {
+	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
 
 type Converter interface {
 	Convert(ctx context.Context, amount float64, fromCurrency, toCurrency string) (float64, float64, error)
 }
 
 type Service struct {
-	db        *infra.Database
+	db        DatabaseReader
 	converter Converter
 }
 
-func NewService(db *infra.Database, converter Converter) *Service {
+func NewService(db DatabaseReader, converter Converter) *Service {
 	return &Service{db: db, converter: converter}
 }
 

@@ -17,9 +17,26 @@ import (
 
 var budgetThresholds = []int{75, 90, 100}
 
+type Store interface {
+	Create(ctx context.Context, n *Notification) error
+	List(ctx context.Context, userID uuid.UUID, limit int, unreadOnly bool) ([]*Notification, error)
+	CountUnread(ctx context.Context, userID uuid.UUID) (int, error)
+	MarkRead(ctx context.Context, userID, id uuid.UUID) error
+	MarkAllRead(ctx context.Context, userID uuid.UUID) error
+	Dismiss(ctx context.Context, userID, id uuid.UUID) error
+	BudgetAlertAlreadySent(ctx context.Context, budgetID uuid.UUID, threshold int, yearMonth string) (bool, error)
+	RecordBudgetAlertSent(ctx context.Context, budgetID uuid.UUID, threshold int, yearMonth string) error
+	ClearBudgetAlertSent(ctx context.Context, budgetID uuid.UUID, threshold int, yearMonth string) error
+}
+
+type DatabaseReader interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
 type Service struct {
-	repo *Repository
-	db   *infra.Database
+	repo Store
+	db   DatabaseReader
 	now  func() time.Time
 }
 

@@ -45,7 +45,7 @@ export function ReportsPage({ user, onLogout }: ReportsPageProps) {
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [selectedFilter, setSelectedFilter] = useState('this-month');
+  const [selectedFilter, setSelectedFilter] = useState('last-30-days');
   const [selectedWallet, setSelectedWallet] = useState('all');
 
   const settings = useUserSettings();

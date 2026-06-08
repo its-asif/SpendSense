@@ -12,13 +12,23 @@ import (
 	"github.com/google/uuid"
 )
 
+type Store interface {
+	Create(ctx context.Context, b *Budget) error
+	GetByID(ctx context.Context, userID, id uuid.UUID) (*Budget, error)
+	List(ctx context.Context, userID uuid.UUID, period string) ([]*Budget, error)
+	Update(ctx context.Context, b *Budget) error
+	Delete(ctx context.Context, userID, id uuid.UUID) error
+	CategoryAccessible(ctx context.Context, userID, categoryID uuid.UUID) (bool, error)
+	HasMonthlyBudgetForCategory(ctx context.Context, userID, categoryID uuid.UUID, excludeID *uuid.UUID) (bool, error)
+}
+
 type Service struct {
-	repo        *Repository
+	repo        Store
 	currencySvc *currency.Service
 	now         func() time.Time
 }
 
-func NewService(repo *Repository, currencySvc *currency.Service) *Service {
+func NewService(repo Store, currencySvc *currency.Service) *Service {
 	return &Service{repo: repo, currencySvc: currencySvc, now: time.Now}
 }
 

@@ -74,6 +74,10 @@ func NewService(cache Cache) (*Service, error) {
 	}, nil
 }
 
+func (s *Service) SetHTTPClient(client *http.Client) {
+	s.http = client
+}
+
 func (s *Service) Metadata(code string) (Metadata, bool) {
 	normalized := normalizeCode(code)
 	meta, ok := s.metadata[normalized]

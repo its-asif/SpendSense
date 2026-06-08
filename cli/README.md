@@ -139,6 +139,59 @@ List expenses:
 spendsense expense list
 ```
 
+Delete an expense:
+
+```bash
+spendsense expense delete <expense-id>
+```
+
+Add an income:
+
+```bash
+spendsense income add \
+  --amount 1500 \
+  --wallet "Cash Wallet" \
+  --category "Salary" \
+  --source "Salary Paycheck"
+```
+
+List incomes:
+
+```bash
+spendsense income list
+```
+
+Delete an income:
+
+```bash
+spendsense income delete <income-id>
+```
+
+View default categories:
+
+```bash
+spendsense category list
+```
+
+View active wallets:
+
+```bash
+spendsense wallet list
+```
+
+Configuration commands:
+
+```bash
+# View configuration
+spendsense config view
+
+# Set a configuration value
+spendsense config set api_url http://localhost:8080
+
+# Get a configuration value
+spendsense config get api_url
+```
+
 Logout:
 
 ```bash

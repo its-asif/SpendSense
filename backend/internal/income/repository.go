@@ -7,11 +7,18 @@ import (
 	"sort"
 
 	"spendsense-backend/internal/domain"
-	"spendsense-backend/internal/infra"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type DBConnection interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	BeginTx(ctx context.Context) (pgx.Tx, error)
+}
 
 type Store interface {
 	CreateIncome(ctx context.Context, income *Income) error
@@ -22,10 +29,10 @@ type Store interface {
 }
 
 type Repository struct {
-	db *infra.Database
+	db DBConnection
 }
 
-func NewRepository(db *infra.Database) *Repository {
+func NewRepository(db DBConnection) *Repository {
 	return &Repository{db: db}
 }
 

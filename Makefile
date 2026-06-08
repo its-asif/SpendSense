@@ -10,6 +10,12 @@ openapi:
 test:
 	cd backend && go test ./...
 
+test-cover:
+	cd backend && go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out
+
+cover-service:
+	cd backend && go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out | grep "service.go"
+
 cli-build:
 	mkdir -p bin
 	cd cli && go build -o ../bin/spendsense .

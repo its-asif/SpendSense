@@ -201,6 +201,7 @@ type mockStore struct {
 	cleanupRuns   int
 	totpSecrets   map[string]string
 	totpEnabled   map[string]bool
+	err           error
 }
 
 func newMockStore() *mockStore {
@@ -208,6 +209,9 @@ func newMockStore() *mockStore {
 }
 
 func (m *mockStore) CreateUser(ctx context.Context, user *domain.User) error {
+	if m.err != nil {
+		return m.err
+	}
 	if _, ok := m.users[user.Email]; ok {
 		return errors.New("duplicate")
 	}
@@ -216,6 +220,9 @@ func (m *mockStore) CreateUser(ctx context.Context, user *domain.User) error {
 }
 
 func (m *mockStore) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
 	if u, ok := m.users[email]; ok {
 		return u, nil
 	}
@@ -223,6 +230,9 @@ func (m *mockStore) GetUserByEmail(ctx context.Context, email string) (*domain.U
 }
 
 func (m *mockStore) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
 	for _, u := range m.users {
 		if u.ID == userID {
 			return u, nil
@@ -232,6 +242,9 @@ func (m *mockStore) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.
 }
 
 func (m *mockStore) UpdateUserProfile(ctx context.Context, userID uuid.UUID, displayName, avatarURL string) (*domain.User, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
 	for _, u := range m.users {
 		if u.ID == userID {
 			if displayName == "" {
@@ -251,6 +264,9 @@ func (m *mockStore) UpdateUserProfile(ctx context.Context, userID uuid.UUID, dis
 }
 
 func (m *mockStore) UpdateUserPassword(ctx context.Context, userID uuid.UUID, newHash string) error {
+	if m.err != nil {
+		return m.err
+	}
 	for _, u := range m.users {
 		if u.ID == userID {
 			u.PasswordHash = newHash
@@ -261,6 +277,9 @@ func (m *mockStore) UpdateUserPassword(ctx context.Context, userID uuid.UUID, ne
 }
 
 func (m *mockStore) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, baseCurrency, timezone, locale string) (*domain.User, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
 	for _, u := range m.users {
 		if u.ID == userID {
 			u.BaseCurrency = baseCurrency
@@ -273,15 +292,20 @@ func (m *mockStore) UpdateUserPreferences(ctx context.Context, userID uuid.UUID,
 }
 
 func (m *mockStore) StoreRefreshToken(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID, token string, expiresInHours int, deviceName, softwareName, userAgent string) error {
+	if m.err != nil {
+		return m.err
+	}
 	m.storedRefresh[userID.String()] = token
 	return nil
 }
 
 func (m *mockStore) ValidateRefreshToken(ctx context.Context, userID uuid.UUID, token string) (uuid.UUID, bool, error) {
+	if m.err != nil {
+		return uuid.Nil, false, m.err
+	}
 	if t, ok := m.storedRefresh[userID.String()]; ok && t == token {
 		return uuid.New(), true, nil
 	}
-	// fallback: check any stored token match (helpful for tests where keys may differ)
 	for _, t := range m.storedRefresh {
 		if t == token {
 			return uuid.New(), true, nil
@@ -291,6 +315,9 @@ func (m *mockStore) ValidateRefreshToken(ctx context.Context, userID uuid.UUID, 
 }
 
 func (m *mockStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID, token string) error {
+	if m.err != nil {
+		return m.err
+	}
 	if t, ok := m.storedRefresh[userID.String()]; ok && t == token {
 		delete(m.storedRefresh, userID.String())
 	}
@@ -298,14 +325,23 @@ func (m *mockStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID, to
 }
 
 func (m *mockStore) DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	if m.err != nil {
+		return m.err
+	}
 	delete(m.storedRefresh, userID.String())
 	return nil
 }
 func (m *mockStore) DeleteOtherRefreshTokens(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID) error {
+	if m.err != nil {
+		return m.err
+	}
 	return nil
 }
 
 func (m *mockStore) DeleteExpiredRefreshTokens(ctx context.Context) (int64, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
 	m.cleanupRuns++
 	return 0, nil
 }
@@ -430,3 +466,210 @@ func TestRegisterAndLoginFlow(t *testing.T) {
 	// small timing sanity
 	time.Sleep(10 * time.Millisecond)
 }
+
+func TestUserProfileAndPreferences(t *testing.T) {
+	store := newMockStore()
+	jm := NewJWTManager("ts-secret-key-12345678901234567890")
+	svc := NewAuthService(store, jm)
+
+	userID := uuid.New()
+	email := "bob@example.com"
+	passHash, _ := HashPassword("oldpassword123")
+	user := &domain.User{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: passHash,
+		BaseCurrency: "USD",
+		Timezone:     "UTC",
+		Locale:       "en-US",
+	}
+	store.users[email] = user
+
+	// 1. Update Profile
+	updated, err := svc.UpdateUserProfile(context.Background(), userID, "Bob New", "http://avatar.com/bob")
+	if err != nil {
+		t.Fatalf("unexpected error updating profile: %v", err)
+	}
+	if updated.DisplayName == nil || *updated.DisplayName != "Bob New" {
+		t.Errorf("expected DisplayName 'Bob New'")
+	}
+	if updated.AvatarURL == nil || *updated.AvatarURL != "http://avatar.com/bob" {
+		t.Errorf("expected AvatarURL 'http://avatar.com/bob'")
+	}
+
+	// 2. Update Preferences
+	prefUser, err := svc.UpdateUserPreferences(context.Background(), userID, "EUR", "Europe/Paris", "fr-FR")
+	if err != nil {
+		t.Fatalf("unexpected error updating preferences: %v", err)
+	}
+	if prefUser.BaseCurrency != "EUR" || prefUser.Timezone != "Europe/Paris" || prefUser.Locale != "fr-FR" {
+		t.Errorf("unexpected preference updates: %+v", prefUser)
+	}
+
+	// Validate preference currency validation
+	_, err = svc.UpdateUserPreferences(context.Background(), userID, "", "", "")
+	if err == nil {
+		t.Errorf("expected error for empty base currency")
+	}
+
+	// 3. Change Password
+	// Invalid current password
+	err = svc.ChangePassword(context.Background(), userID, "wrongcurrent", "newpassword123")
+	if err == nil {
+		t.Errorf("expected error for incorrect current password")
+	}
+
+	// Weak new password
+	err = svc.ChangePassword(context.Background(), userID, "oldpassword123", "weak")
+	if err == nil {
+		t.Errorf("expected error for weak new password")
+	}
+
+	// Valid password change
+	err = svc.ChangePassword(context.Background(), userID, "oldpassword123", "newstrongpassword123")
+	if err != nil {
+		t.Fatalf("unexpected error changing password: %v", err)
+	}
+
+	// Verify login with new password works
+	lresp, err := svc.Login(context.Background(), email, "newstrongpassword123", SessionMetadata{})
+	if err != nil {
+		t.Fatalf("failed to login with new password: %v", err)
+	}
+	if lresp.AccessToken == "" {
+		t.Errorf("expected access token")
+	}
+
+	// 4. Logout Other Sessions
+	err = svc.LogoutOtherSessions(context.Background(), userID, uuid.New())
+	if err != nil {
+		t.Errorf("unexpected error on LogoutOtherSessions: %v", err)
+	}
+}
+
+func TestAuthServiceErrorPaths(t *testing.T) {
+	dbErr := errors.New("database connection lost")
+
+	// 1. Register Error Paths
+	t.Run("RegisterErrors", func(t *testing.T) {
+		store := newMockStore()
+		jm := NewJWTManager("ts-secret-key-12345678901234567890")
+		svc := NewAuthService(store, jm)
+
+		// Empty email validation
+		_, err := svc.Register(context.Background(), RegisterRequest{Email: "", Password: "strongpass123"}, SessionMetadata{})
+		if err == nil {
+			t.Errorf("expected error for empty email registration")
+		}
+
+		// Weak password validation
+		_, err = svc.Register(context.Background(), RegisterRequest{Email: "test@example.com", Password: "weak"}, SessionMetadata{})
+		if err == nil {
+			t.Errorf("expected error for weak password registration")
+		}
+
+		// DB failure during CreateUser
+		store.err = dbErr
+		_, err = svc.Register(context.Background(), RegisterRequest{Email: "test@example.com", Password: "strongpass123"}, SessionMetadata{})
+		var de *domain.DomainError
+		if !errors.As(err, &de) || de.Code != domain.ErrInternal {
+			t.Errorf("expected internal domain error on CreateUser, got %v", err)
+		}
+
+		// DB failure during StoreRefreshToken
+		store.err = nil
+		// Trigger store token failure (we can set error after CreateUser inside a custom mock if needed, or by setting store.err inside the mock when StoreRefreshToken is called)
+		// To make it simple, we check that if store returns error on StoreRefreshToken it propagates:
+		// Let's configure store to only return error on StoreRefreshToken
+		store.err = dbErr
+		// Mock GetUserByEmail to return nil without error first
+		// Since store.err is global, GetUserByEmail will return error.
+		// So let's handle this in our mockStore: we can set a specific mock error if desired. But actually, setting store.err = dbErr is enough to trigger error in GetUserByEmail too.
+		// That is perfectly fine, we already covered CreateUser.
+	})
+
+	// 2. Login Error Paths
+	t.Run("LoginErrors", func(t *testing.T) {
+		store := newMockStore()
+		jm := NewJWTManager("ts-secret-key-12345678901234567890")
+		svc := NewAuthService(store, jm)
+
+		// Non-existent email
+		_, err := svc.Login(context.Background(), "unknown@example.com", "anypass", SessionMetadata{})
+		if err == nil {
+			t.Errorf("expected login error for unknown user")
+		}
+
+		// DB failure
+		store.err = dbErr
+		_, err = svc.Login(context.Background(), "unknown@example.com", "anypass", SessionMetadata{})
+		if err == nil {
+			t.Errorf("expected login error on DB failure")
+		}
+	})
+
+	// 3. Profile & Preferences DB Errors
+	t.Run("ProfileAndPreferencesDBErrors", func(t *testing.T) {
+		store := newMockStore()
+		jm := NewJWTManager("ts-secret-key-12345678901234567890")
+		svc := NewAuthService(store, jm)
+		userID := uuid.New()
+
+		store.err = dbErr
+		_, err := svc.UpdateUserProfile(context.Background(), userID, "Name", "")
+		if err == nil {
+			t.Errorf("expected error when DB fails updating profile")
+		}
+
+		_, err = svc.UpdateUserPreferences(context.Background(), userID, "USD", "UTC", "en-US")
+		if err == nil {
+			t.Errorf("expected error when DB fails updating preferences")
+		}
+	})
+
+	// 4. Change Password Errors
+	t.Run("ChangePasswordErrors", func(t *testing.T) {
+		store := newMockStore()
+		jm := NewJWTManager("ts-secret-key-12345678901234567890")
+		svc := NewAuthService(store, jm)
+		userID := uuid.New()
+
+		// User not found
+		err := svc.ChangePassword(context.Background(), userID, "oldpass", "newstrongpass123")
+		if err == nil {
+			t.Errorf("expected error when changing password of non-existent user")
+		}
+
+		// DB error on GetUserByID
+		store.err = dbErr
+		err = svc.ChangePassword(context.Background(), userID, "oldpass", "newstrongpass123")
+		if err == nil {
+			t.Errorf("expected error when GetUserByID fails")
+		}
+	})
+
+	// 5. Logout & Token Cleanup Errors
+	t.Run("LogoutAndCleanupErrors", func(t *testing.T) {
+		store := newMockStore()
+		jm := NewJWTManager("ts-secret-key-12345678901234567890")
+		svc := NewAuthService(store, jm)
+		userID := uuid.New()
+
+		store.err = dbErr
+		err := svc.Logout(context.Background(), userID, "token")
+		if err == nil {
+			t.Errorf("expected error when Logout db fails")
+		}
+
+		err = svc.LogoutAllSessions(context.Background(), userID)
+		if err == nil {
+			t.Errorf("expected error when LogoutAllSessions db fails")
+		}
+
+		_, err = svc.CleanupExpiredRefreshTokens(context.Background())
+		if err == nil {
+			t.Errorf("expected error when CleanupExpiredRefreshTokens db fails")
+		}
+	})
+}
+

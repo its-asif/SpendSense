@@ -7,15 +7,22 @@ import (
 	"strings"
 
 	"spendsense-backend/internal/domain"
-	"spendsense-backend/internal/infra"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Repository struct{ db *infra.Database }
+// DBConnection is the minimal database interface the category repository needs.
+type DBConnection interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
-func NewRepository(db *infra.Database) *Repository { return &Repository{db: db} }
+type Repository struct{ db DBConnection }
+
+func NewRepository(db DBConnection) *Repository { return &Repository{db: db} }
 
 func (r *Repository) CreateCategory(ctx context.Context, userID uuid.UUID, c *Category) error {
 	row := r.db.QueryRow(ctx, `
